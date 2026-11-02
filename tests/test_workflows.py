@@ -14,17 +14,17 @@ def test_ci_runs_on_push_and_pull_request_and_checks_immutability():
     assert "push" in triggers
     assert "pull_request" in triggers
     steps = [s for job in doc["jobs"].values() for s in job["steps"]]
-    assert any("ftracker.immutability" in s.get("run", "") for s in steps)
+    assert any("ftracker/immutability.py" in s.get("run", "") for s in steps)
 
 
 def test_ci_check_wiring():
     doc = yaml.safe_load(CI.read_text(encoding="utf-8"))
     steps = [s for job in doc["jobs"].values() for s in job["steps"]]
     assert not any("continue-on-error" in s for s in steps)
-    runs = [s["run"] for s in steps if "ftracker.immutability" in s.get("run", "")]
+    runs = [s["run"] for s in steps if "ftracker/immutability.py" in s.get("run", "")]
     assert any("github.event.before" in r for r in runs)
     assert any("github.event.pull_request.base.sha" in r for r in runs)
-    first_imm = next(i for i, s in enumerate(steps) if "ftracker.immutability" in s.get("run", ""))
+    first_imm = next(i for i, s in enumerate(steps) if "ftracker/immutability.py" in s.get("run", ""))
     pytest_at = next(i for i, s in enumerate(steps) if s.get("run") == "pytest")
     assert first_imm < pytest_at
     assert any(s.get("run") == 'pip install -e ".[dev]"' for s in steps)
@@ -180,7 +180,7 @@ def test_ci_runs_checker_copied_from_base_revision():
         assert body.splitlines()[0] == f'BASE="{expr}"'
         assert 'checker="$RUNNER_TEMP/immutability_base.py"' in body
         assert 'git show "$BASE:src/ftracker/immutability.py" > "$checker"' in body
-        assert 'python "$checker"' in body
+        assert 'python -I -S "$checker"' in body
         assert 'run_base --base "$BASE"' in body
         assert 'run_modes --base "$BASE" --guard' in body
         assert "run_modes --whole-history" in body
@@ -223,7 +223,7 @@ def _ci_repo(tmp_path):
     return repo, base, commit, write
 
 
-def _run_ci_body(tmp_path, repo, base):
+def _run_ci_body(tmp_path, repo, base, **extra_env):
     import os
     import shutil
     import subprocess
@@ -239,7 +239,7 @@ def _run_ci_body(tmp_path, repo, base):
     temp = tmp_path / "runner_temp"
     temp.mkdir(exist_ok=True)
     env = dict(os.environ, RUNNER_TEMP=temp.as_posix(),
-               PATH=os.path.dirname(sys.executable) + os.pathsep + os.environ.get("PATH", ""))
+               PATH=os.path.dirname(sys.executable) + os.pathsep + os.environ.get("PATH", ""), **extra_env)
     return subprocess.run([bash, "-eo", "pipefail", "-c", body], cwd=repo, env=env, capture_output=True, text=True)
 
 
@@ -299,9 +299,13 @@ def test_ci_body_falls_back_when_base_has_no_checker(tmp_path):
     _git(repo, "config", "user.name", "Test")
     _git(repo, "config", "user.email", "test@example.com")
     _write(repo, "README.md", "no checker yet\n")
+    _write(repo, "data/forecasts/s/2026-01-01.json", "1\n")
     base = _commit(repo, "before the checker existed")
-    _write(repo, "data/forecasts/s/2026-01-02.json", "1\n")
-    _commit(repo, "add")
+    # the fallback runs the HEAD file as a script (no installed package), so HEAD adds it;
+    # with no data in the same push, or the guard rule would (rightly) fire
+    _write(repo, "src/ftracker/immutability.py",
+           (ROOT / "src" / "ftracker" / "immutability.py").read_text(encoding="utf-8"))
+    _commit(repo, "add the checker")
     done = _run_ci_body(tmp_path, repo, base)
     assert "using the HEAD version" in done.stdout
     assert done.returncode == 0, done.stdout + done.stderr
@@ -325,3 +329,115 @@ def test_daily_renders_readme_after_site_and_commits_it_with_results():
     paths = body.split("commit_and_push.sh", 1)[1].split("\n", 1)[0].split()
     assert paths[-2:] == ["results", "README.md"]
     assert not any("render_readme" in s.get("run", "") for i, s in enumerate(steps) if i != results)
+
+
+# ---------- CI: checks run isolated, before any HEAD code is installed ----------
+
+def _install_idx(steps):
+    return next(i for i, s in enumerate(steps) if "pip install" in s.get("run", ""))
+
+
+def test_ci_immutability_steps_come_before_the_install_step():
+    steps = _ci_steps()
+    push, pr = _imm_bodies()
+    install = _install_idx(steps)
+    assert steps.index(push) < install and steps.index(pr) < install
+    assert install < steps.index(next(s for s in steps if s.get("run") == "pytest"))
+    setup = next(i for i, s in enumerate(steps) if str(s.get("uses", "")).startswith("actions/setup-python"))
+    assert setup < steps.index(push)
+    checkout = next(s for s in steps if str(s.get("uses", "")).startswith("actions/checkout"))
+    assert checkout["with"]["fetch-depth"] == 0
+
+
+def test_ci_no_step_before_install_runs_pip_or_imports_the_package():
+    steps = _ci_steps()
+    for s in steps[:_install_idx(steps)]:
+        run = s.get("run", "")
+        assert not re.search(r"\bpip[0-9.]*\b|\buv\b|\bsetup\.py\b", run), run  # "pipefail" is fine
+        assert "-m ftracker" not in run and "import ftracker" not in run and "ftracker." not in run
+
+
+def test_ci_every_checker_invocation_is_isolated_and_a_script():
+    push, pr = _imm_bodies()
+    for step in (push, pr):
+        body = step["run"]
+        assert "-m ftracker" not in body
+        assert 'python -I -S "$checker"' in body
+        assert "python -I -S src/ftracker/immutability.py" in body
+        calls = re.findall(r"\bpython[0-9.]*\b[^\n;}]*", body)
+        assert calls, body
+        for call in calls:
+            assert call.startswith("python -I -S "), call
+
+
+def test_ci_fails_on_a_shallow_clone_before_the_whole_history_scan():
+    push, pr = _imm_bodies()
+    for step in (push, pr):
+        body = step["run"]
+        assert "git rev-parse --is-shallow-repository" in body
+        assert body.index("--is-shallow-repository") < body.index("run_modes --whole-history")
+        guard = body[body.index("--is-shallow-repository"):body.index("run_modes --whole-history")]
+        assert "exit 1" in guard
+
+
+def _hostile_payload(marker):
+    """Leave a marker naming the module, then fake success for the whole interpreter."""
+    return (f"import os\nopen({str(marker)!r}, 'a').write(__name__ + '\\n')\n"
+            "os._exit(0)\n")
+
+
+def test_isolated_checker_ignores_hostile_sitecustomize_and_package(tmp_path):
+    import os
+    import shutil
+    import subprocess
+    import sys
+
+    repo, base, commit, write = _ci_repo(tmp_path)
+    write(repo, "data/forecasts/s/2026-01-01.json", "tampered\n")
+    commit(repo, "edit history")
+    marker = tmp_path / "marker.txt"
+    hostile = tmp_path / "hostile"
+    (hostile / "ftracker").mkdir(parents=True)
+    payload = _hostile_payload(marker)
+    for rel in ("sitecustomize.py", "usercustomize.py", "ftracker/__init__.py", "ftracker/immutability.py"):
+        (hostile / rel).write_text(payload, encoding="utf-8")
+    script = hostile / "immutability_base.py"  # the script directory holds the hostile files too
+    shutil.copy(ROOT / "src" / "ftracker" / "immutability.py", script)
+    env = dict(os.environ, PYTHONPATH=str(hostile))
+    done = subprocess.run([sys.executable, "-I", "-S", str(script), "--repo", str(repo), "--base", base],
+                          cwd=hostile, env=env, capture_output=True, text=True)
+    assert done.returncode == 1, done.stdout + done.stderr
+    assert "data/forecasts/s/2026-01-01.json" in done.stderr
+    assert not marker.exists(), marker.read_text(encoding="utf-8")
+    # control: without -I -S the same files do run, so the test can see an attack when one happens
+    subprocess.run([sys.executable, str(script), "--help"], cwd=hostile, env=env, capture_output=True)
+    assert marker.exists()
+
+
+def test_ci_body_ignores_a_head_sitecustomize_on_the_path(tmp_path):
+    repo, base, commit, write = _ci_repo(tmp_path)
+    marker = tmp_path / "marker.txt"
+    write(repo, "src/sitecustomize.py", _hostile_payload(marker))  # not a guard file
+    write(repo, "data/forecasts/s/2026-01-01.json", "tampered\n")
+    commit(repo, "plant sitecustomize and edit history")
+    # PYTHONPATH stands in for the editable install's .pth entry that puts src/ on sys.path
+    done = _run_ci_body(tmp_path, repo, base, PYTHONPATH=str(repo / "src"))
+    assert done.returncode != 0, done.stdout + done.stderr
+    assert "data/forecasts/s/2026-01-01.json" in done.stderr
+    assert not marker.exists()
+
+
+def test_ci_body_fails_on_a_shallow_clone(tmp_path):
+    import subprocess
+
+    repo, _, commit, write = _ci_repo(tmp_path)
+    write(repo, "data/forecasts/s/2026-01-02.json", "1\n")
+    base = commit(repo, "second")
+    write(repo, "data/forecasts/s/2026-01-03.json", "1\n")
+    commit(repo, "third")
+    shallow = tmp_path / "shallow"
+    subprocess.run(["git", "clone", "-q", "--depth", "2", repo.as_uri(), str(shallow)],
+                   check=True, capture_output=True, text=True)
+    done = _run_ci_body(tmp_path, shallow, base)
+    assert done.returncode != 0
+    assert "shallow" in (done.stdout + done.stderr).lower()

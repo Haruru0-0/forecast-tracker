@@ -1,7 +1,8 @@
 """Fail when a commit range edits, deletes or renames protected history files.
 
 Standard library only: CI copies this file out of the base revision and runs it standalone
-(``python immutability_base.py --base <sha>``), so it must never import ``ftracker``.
+and isolated (``python -I -S immutability_base.py --base <sha>``), before any HEAD code is
+installed, so it must never import ``ftracker`` or anything outside the standard library.
 
 Modes:
   --base B            every commit in B..HEAD (and the net diff) may only add protected files
@@ -98,7 +99,14 @@ def roots(repo: Path, head: str = "HEAD") -> list[str]:
 
 
 def check_whole_history(repo: Path, head: str = "HEAD") -> list[str]:
-    """The per-commit check from every root commit (a root commit can only add files)."""
+    """The per-commit check from every root commit (a root commit can only add files).
+
+    Refuses a shallow clone: there ``rev-list --max-parents=0`` returns the shallow
+    boundary, not the real roots, so the scan would pass without seeing old commits.
+    """
+    if _git(repo, "rev-parse", "--is-shallow-repository").strip() == "true":
+        raise ValueError("shallow repository: the whole-history scan needs the full history "
+                         "(fetch-depth: 0)")
     out: list[str] = []
     for root in roots(repo, head):
         for v in check_immutable(repo, root, head):

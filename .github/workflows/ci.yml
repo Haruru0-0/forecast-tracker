@@ -8,6 +8,12 @@ on:
 # check that judges it. The HEAD copy is used only when the base has no checker (or no
 # mode it needs) or on the first push of a branch (all-zero base). The two check steps
 # below run the same body; only the BASE line differs.
+#
+# Both checks run BEFORE the dependency install and with `python -I -S`: an editable
+# install would put HEAD's src/ on sys.path (a .pth file), so a HEAD sitecustomize.py or
+# install-time code could patch the base checker. -I ignores PYTHON* variables and the
+# script directory, -S skips `site` (no .pth files, no sitecustomize). The checker is
+# standard library only, and the HEAD fallback runs the file as a script, never `-m`.
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -18,8 +24,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install
-        run: pip install -e ".[dev]"
       - name: Immutability check (push)
         if: github.event_name == 'push'
         run: |
@@ -30,19 +34,25 @@ jobs:
               && git cat-file -e "$BASE:src/ftracker/immutability.py" 2>/dev/null; then
             git show "$BASE:src/ftracker/immutability.py" > "$checker"
             echo "Using the checker from the base revision $BASE"
-            run_base() { python "$checker" "$@"; }
+            run_base() { python -I -S "$checker" "$@"; }
           else
             echo "No checker at the base revision (or first push); using the HEAD version"
-            run_base() { python -m ftracker.immutability "$@"; }
+            run_base() { python -I -S src/ftracker/immutability.py "$@"; }
           fi
           # Modes added after the base revision fall back to the HEAD version.
           if [[ "$(run_base --help)" == *--whole-history* ]]; then
             run_modes() { run_base "$@"; }
           else
-            run_modes() { python -m ftracker.immutability "$@"; }
+            run_modes() { python -I -S src/ftracker/immutability.py "$@"; }
           fi
           run_base --base "$BASE"
           run_modes --base "$BASE" --guard
+          # On a shallow clone the root commits are the shallow boundary, so the scan
+          # below would pass without seeing the old history.
+          if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+            echo "Shallow clone: the whole-history scan needs fetch-depth: 0" >&2
+            exit 1
+          fi
           run_modes --whole-history
       - name: Immutability check (pull request)
         if: github.event_name == 'pull_request'
@@ -54,19 +64,27 @@ jobs:
               && git cat-file -e "$BASE:src/ftracker/immutability.py" 2>/dev/null; then
             git show "$BASE:src/ftracker/immutability.py" > "$checker"
             echo "Using the checker from the base revision $BASE"
-            run_base() { python "$checker" "$@"; }
+            run_base() { python -I -S "$checker" "$@"; }
           else
             echo "No checker at the base revision (or first push); using the HEAD version"
-            run_base() { python -m ftracker.immutability "$@"; }
+            run_base() { python -I -S src/ftracker/immutability.py "$@"; }
           fi
           # Modes added after the base revision fall back to the HEAD version.
           if [[ "$(run_base --help)" == *--whole-history* ]]; then
             run_modes() { run_base "$@"; }
           else
-            run_modes() { python -m ftracker.immutability "$@"; }
+            run_modes() { python -I -S src/ftracker/immutability.py "$@"; }
           fi
           run_base --base "$BASE"
           run_modes --base "$BASE" --guard
+          # On a shallow clone the root commits are the shallow boundary, so the scan
+          # below would pass without seeing the old history.
+          if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+            echo "Shallow clone: the whole-history scan needs fetch-depth: 0" >&2
+            exit 1
+          fi
           run_modes --whole-history
+      - name: Install
+        run: pip install -e ".[dev]"
       - name: Test
         run: pytest

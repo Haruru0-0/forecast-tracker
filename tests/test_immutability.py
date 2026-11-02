@@ -359,3 +359,19 @@ def test_guard_passes_data_only_and_guard_only_pushes(repo):
     write(repo, ".github/workflows/daily.yml", "changed\n")
     commit(repo, "guard only")
     assert check_guard(repo, base) == []
+
+
+def test_whole_history_refuses_a_shallow_clone(tmp_path, repo):
+    write(repo, "data/forecasts/s/2026-01-01.json", "tampered\n")
+    commit(repo, "old edit")
+    write(repo, "data/forecasts/s/2026-01-02.json", "1\n")
+    commit(repo, "later")
+    shallow = tmp_path / "shallow"
+    subprocess.run(["git", "clone", "-q", "--depth", "1", repo.as_uri(), str(shallow)],
+                   check=True, capture_output=True, text=True)
+    assert git(shallow, "rev-parse", "--is-shallow-repository") == "true"
+    with pytest.raises(ValueError, match="shallow"):
+        check_whole_history(shallow)
+    assert main(["--whole-history", "--repo", str(shallow)]) == 2
+    standalone = _standalone(tmp_path, shallow, "--whole-history")
+    assert standalone.returncode == 2 and "shallow" in standalone.stderr
