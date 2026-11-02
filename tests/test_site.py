@@ -392,5 +392,67 @@ def test_inline_script_is_present_safe_and_self_contained(tmp_path):
     assert "data-target" in site.SCRIPT and "data-last-issue" in site.SCRIPT and "data-past-note" in site.SCRIPT
     assert not re.search(r"<link[^>]+href=[\"']?https?:", html)
     assert "@font-face" not in html and "fonts.googleapis" not in html and "url(" not in html
-    assert "http://" not in html.replace("http://www.w3.org/2000/svg", "") and "https://" not in html
+    assert "http://" not in html.replace("http://www.w3.org/2000/svg", "")
+    assert not re.search(r"src=", html)  # no external resource of any kind; plain <a href> links are fine
     assert "a&amp;b" in html and "a&b" not in _markup(html)
+
+
+# ---------- about this data ----------
+
+def _about_html(tmp_path, monkeypatch, repo=None, names=("weather_tmax", "air_quality_aqi",
+                                                         "electricity_peak_mw", "river_discharge_cfs")):
+    if repo is None:
+        monkeypatch.delenv("GITHUB_REPOSITORY", raising=False)
+    else:
+        monkeypatch.setenv("GITHUB_REPOSITORY", repo)
+    root, page = build(tmp_path, names=names)
+    write_status(root, NOW)
+    html = page()
+    assert "About this data" in html
+    return html.split('<h2 id="about">About this data</h2>', 1)[1].split("</main>")[0]
+
+
+def test_about_names_the_metro_from_config(tmp_path, monkeypatch):
+    from ftracker import config
+    monkeypatch.setitem(config.METRO, "name", "Test <City> & Co")
+    about = _about_html(tmp_path, monkeypatch)
+    assert "Test &lt;City&gt; &amp; Co" in about and "<City>" not in about
+
+
+def test_about_defines_every_series(tmp_path, monkeypatch):
+    about = _about_html(tmp_path, monkeypatch)
+    for name, words in {"weather_tmax": ("maximum", "degC", "Open-Meteo", "local calendar day"),
+                        "air_quality_aqi": ("US AQI", "modelled estimate", "Copernicus CAMS", "not a sensor reading"),
+                        "electricity_peak_mw": ("peak", "MW", "EIA", "highest hourly value"),
+                        "river_discharge_cfs": ("discharge", "ft3/s", "USGS", "mean of its hourly means")}.items():
+        item = about.split(f"<strong>{name}</strong>", 1)[1].split("</li>", 1)[0]
+        for w in words:
+            assert w in item, (name, w)
+
+
+def test_about_credits_sources_with_licence_links(tmp_path, monkeypatch):
+    about = _about_html(tmp_path, monkeypatch)
+    assert '<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>' in about
+    assert ">public domain</a>" in about and "usgs.gov" in about
+    assert ">public data</a>" in about and "eia.gov" in about
+    assert "Open-Meteo" in about
+
+
+def test_about_links_repository_only_when_set(tmp_path, monkeypatch):
+    assert "github.com" not in _about_html(tmp_path, monkeypatch)
+    (tmp_path / "b").mkdir()
+    (tmp_path / "c").mkdir()
+    about = _about_html(tmp_path / "b", monkeypatch, repo="ahmad/forecast-tracker")
+    assert '<a href="https://github.com/ahmad/forecast-tracker">' in about
+    bad = _about_html(tmp_path / "c", monkeypatch, repo='x/y"><script>alert(1)</script>')
+    assert "github.com" not in bad and "<script>alert" not in bad
+
+
+def test_about_says_commit_time_is_the_timestamp_of_record(tmp_path, monkeypatch):
+    about = _about_html(tmp_path, monkeypatch)
+    assert "timestamp of record for each forecast is the time of the git commit" in about
+
+
+def test_about_skips_unknown_series_and_escapes(tmp_path, monkeypatch):
+    about = _about_html(tmp_path, monkeypatch, names=("a&b",))
+    assert "a&b" not in about and "<li><strong>" not in about.split("Sources")[0]

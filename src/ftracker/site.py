@@ -9,12 +9,14 @@ from __future__ import annotations
 import html
 import json
 import math
+import os
+import re
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pandas as pd
 
-from ftracker import registry, scoring, store
+from ftracker import config, registry, scoring, store
 
 STALE_AFTER = timedelta(hours=36)
 MIN_TREND = 14
@@ -291,6 +293,7 @@ h3{font-size:1.02rem;margin:0 0 4px;overflow-wrap:anywhere}
 .unit,.muted{color:var(--muted);font-weight:400}.muted{margin:2px 0 8px;font-size:.9rem}
 .rule{color:var(--muted);margin:8px 0}
 .banner{background:var(--warn-bg);color:var(--warn-fg);border:1px solid var(--warn-line);border-radius:8px;padding:10px 14px;margin:14px 0}
+.about li{margin:4px 0}.about a{color:var(--accent)}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin:0 0 16px}
 .note.bad{color:var(--warn-fg);background:var(--warn-bg);border-radius:6px;padding:6px 10px;margin:6px 0;overflow-wrap:anywhere}
 .scroll{overflow-x:auto}
@@ -371,6 +374,55 @@ def _gap_line(name: str, root: Path) -> str:
     last = gaps.sort_values("issue_date").iloc[-1]
     return (f'<p class="muted">{len(gaps)} gap day(s); latest {last["issue_date"].isoformat()}: '
             f'{_e(last["reason"])}</p>')
+
+
+def _definitions() -> dict[str, str]:
+    """One line per series name: what is measured, unit, source, how a local day is formed."""
+    m = config.METRO
+    tz = m["tz"]
+    return {
+        "weather_tmax": (f"Daily maximum air temperature at 2 m, in degC, from the Open-Meteo weather API. "
+                         f"The day is the local calendar day in {tz}, as Open-Meteo computes it for that time zone."),
+        "air_quality_aqi": ("Daily mean US AQI from the Open-Meteo air-quality API. This is a modelled estimate "
+                            "(Open-Meteo / Copernicus CAMS), not a sensor reading. A local day "
+                            f"({tz}) is the mean of its hourly values and is left empty if any hour is missing."),
+        "electricity_peak_mw": (f"Daily peak of hourly electricity demand, in MW, for the EIA-930 balancing authority "
+                                f"{m['eia_respondent']} (the whole balancing area, not only the metro), from the EIA "
+                                f"API. A local day ({tz}) is its highest hourly value and is left empty if any hour "
+                                "is missing."),
+        "river_discharge_cfs": (f"Daily mean river discharge, in ft3/s, at USGS gauge {m['usgs_site']} (parameter "
+                                f"{m['usgs_parameter']}), from USGS instantaneous values (15-minute readings). "
+                                "Readings are averaged into hourly means; a local day "
+                                f"({tz}) is the mean of its hourly means and is left empty if any hour is missing."),
+    }
+
+
+SOURCES = (
+    ("Open-Meteo", "https://open-meteo.com/", "CC BY 4.0", "https://creativecommons.org/licenses/by/4.0/"),
+    ("USGS Water Data", "https://waterdata.usgs.gov/", "public domain",
+     "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits"),
+    ("U.S. Energy Information Administration (EIA)", "https://www.eia.gov/opendata/", "public data",
+     "https://www.eia.gov/about/copyrights_reuse.php"),
+)
+_REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
+
+
+def _about(series_names: list[str], repository: str | None) -> str:
+    defs = _definitions()
+    items = "".join(f"<li><strong>{_e(n)}</strong> ({_e(_unit(n) or 'no unit')}): {_e(defs[n])}</li>"
+                    for n in series_names if n in defs)
+    sources = "".join(f'<li><a href="{_e(url)}">{_e(name)}</a>, <a href="{_e(lic_url)}">{_e(lic)}</a></li>'
+                      for name, url, lic, lic_url in SOURCES)
+    repo = ""
+    if repository and _REPO.fullmatch(repository):
+        url = f"https://github.com/{repository}"
+        repo = f'<p>Code and the full record: <a href="{_e(url)}">{_e(url)}</a></p>'
+    return (f'<h2 id="about">About this data</h2><article class="card about">'
+            f'<p>Metro: <strong>{_e(config.METRO["name"])}</strong>.</p>'
+            f"<ul>{items}</ul>"
+            f"<p>Sources and licences:</p><ul>{sources}</ul>{repo}"
+            "<p>The timestamp of record for each forecast is the time of the git commit that added it.</p>"
+            "</article>")
 
 
 def build_site(root: Path, out_dir: Path, now: datetime, series_names: list[str]) -> Path:
@@ -468,6 +520,7 @@ def build_site(root: Path, out_dir: Path, now: datetime, series_names: list[str]
 {"".join(score_cards)}
 <h2>Model vs baseline</h2>{"".join(compare)}
 {backtest_html}
+{_about(series_names, os.environ.get("GITHUB_REPOSITORY"))}
 </main>
 <script>{SCRIPT}</script>
 </body></html>
