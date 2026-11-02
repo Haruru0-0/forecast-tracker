@@ -202,3 +202,122 @@ def test_all_scoreboards_concatenates_series(tmp_path):
     assert set(df["series"]) == {"s1", "s2"}
     assert list(df.columns) == ["series", "method", "horizon", "n", "n_missing", "mae", "coverage", "skill", "n_skill"]
     assert site.all_scoreboards(root, ["nothing"]).empty
+
+
+def test_stale_boundary_is_exactly_36_hours(tmp_path):
+    root, page = build(tmp_path)
+    write_status(root, NOW - timedelta(hours=36))
+    assert "STALE" not in page()
+    write_status(root, NOW - timedelta(hours=36, seconds=1))
+    assert "STALE" in page()
+
+
+def test_naive_last_run_is_treated_as_utc(tmp_path):
+    root, page = build(tmp_path)
+    (root / "status.json").write_text(json.dumps({"last_run": "2026-11-02T00:00:00", "series": {}}))
+    html = page()
+    assert "2026-11-02 00:00 UTC" in html and "STALE" not in html
+    (root / "status.json").write_text(json.dumps({"last_run": "2026-10-31T00:00:00", "series": {}}))
+    assert "STALE" in page()
+
+
+def test_corrupt_status_json_says_unreadable_and_is_stale(tmp_path):
+    root, page = build(tmp_path)
+    make_data(root, issues=3)
+    for bad in ("{not json", "[1, 2]", '"text"', json.dumps({"series": {}}), json.dumps({"last_run": 5})):
+        (root / "status.json").write_text(bad)
+        html = page()
+        assert "STALE" in html and "status.json is unreadable" in html
+
+
+def test_status_with_malformed_series_does_not_crash(tmp_path):
+    root, page = build(tmp_path)
+    make_data(root, issues=3)
+    for series in ([], "oops", {"s1": "oops"}, {"s1": ["x"]}, {"s1": None}):
+        (root / "status.json").write_text(json.dumps({"last_run": NOW.isoformat(), "series": series}))
+        html = page()
+        assert "STALE" not in html and "no forecast issued" not in html
+
+
+def test_old_forecast_is_flagged_not_hidden(tmp_path):
+    root, page = build(tmp_path)
+    make_data(root, issues=3)  # last issue 2026-09-03, now is 2026-11-02
+    store.write_gap(root, "s1", date(2026, 10, 1), "source down")
+    write_status(root, NOW, {"s1": {"last_issue": "2026-09-03", "error": "boom"}})
+    html = page()
+    assert "last forecast issued 60 days ago; targets in the past" in html
+    assert "newer gap on 2026-10-01" in html
+    assert html.count('class=past') == 7
+    assert html.count('data-up-row="s1-h') == 7
+    assert "no forecast issued: boom" in html
+
+
+def test_fresh_forecast_has_no_past_flag(tmp_path):
+    root, page = build(tmp_path)
+    make_data(root, issues=1)
+    write_status(root, NOW)
+    # issue 2026-09-01 vs now 2026-11-02 is old; use a now right after the issue instead
+    html = site.build_site(root, tmp_path / "o2", datetime(2026, 9, 2, 8, tzinfo=timezone.utc), ["s1"]).read_text(encoding="utf-8")
+    assert "targets in the past" not in html
+
+
+def test_units_in_headings_headers_and_charts(tmp_path, monkeypatch):
+    from ftracker import registry
+    from ftracker.series import Series
+    monkeypatch.setitem(registry.SERIES, "x", Series("s1", "degC", "UTC", lambda a, b: None))
+    root, page = build(tmp_path)
+    make_data(root, issues=5)
+    write_status(root, NOW)
+    html = page()
+    assert html.count("<h3>s1 <span class=\"unit\">(degC)</span></h3>") == 3
+    assert "MAE (degC)" in html
+    assert "Seasonal naive (degC)" in html and "Persistence (degC)" in html
+    assert ">MAE (degC)</text>" in html  # bar chart axis label
+    assert '<text class="tick" x="2" y="18">degC</text>' in html  # fan chart axis label
+
+
+def test_backtest_numbers_and_live_numbers_stay_separate(tmp_path):
+    root, page = build(tmp_path)
+    make_data(root, issues=5)
+    write_status(root, NOW)
+    bt = [{"origin": (date(2025, 1, 1) + timedelta(days=i)).isoformat(), "method": m,
+           "target_date": (date(2025, 1, 1) + timedelta(days=i + h)).isoformat(), "horizon": h,
+           "point": 5.0, "lo": 4.0, "hi": 6.0, "actual": 5.5}
+          for i in range(20) for m in ("model", "seasonal_naive", "persistence") for h in range(1, 8)]
+    before = page()
+    (root / "backtest").mkdir()
+    pd.DataFrame(bt).to_csv(root / "backtest" / "s1.csv", index=False)
+    after = page()
+    head, tail = after.split("Backtest (historical, not live)")
+    assert head.count("<td>5</td>") == before.count("<td>5</td>")
+    row = tail.split('data-bt-row="s1-h1"')[1].split("</tr>")[0]
+    assert "<td>0.50</td>" in row and "<td>100%</td>" in row
+    live = head.split('data-row="s1-h1"')[1].split("</tr>")[0]
+    assert "<td>5</td>" in live and "<td>1.00</td>" in live and "<td>0.50</td>" not in live
+
+
+def test_backtest_with_missing_columns_does_not_crash(tmp_path):
+    root, page = build(tmp_path)
+    make_data(root, issues=3)
+    write_status(root, NOW)
+    (root / "backtest").mkdir()
+    pd.DataFrame({"origin": ["2025-01-01"], "method": ["model"]}).to_csv(root / "backtest" / "s1.csv", index=False)
+    html = page()
+    assert "Backtest (historical, not live)" in html
+    assert "unreadable or lacks required columns" in html
+    (root / "backtest" / "s1.csv").write_bytes(b"")
+    assert "unreadable or lacks required columns" in page()
+
+
+def test_nan_forecast_values_never_reach_the_page(tmp_path):
+    root, page = build(tmp_path)
+    nan = float("nan")
+    rows = _rows(D0)
+    rows.loc[(rows.method == "model") & (rows.horizon == 3), ["point", "lo", "hi"]] = nan
+    rows.loc[(rows.method == "persistence") & (rows.horizon == 2), "point"] = nan
+    rows.loc[(rows.method == "model") & (rows.horizon == 5), ["lo", "hi"]] = nan
+    store.write_forecast(root, "s1", D0, rows, {})
+    write_status(root, NOW)
+    html = page()
+    assert "nan" not in html.lower().replace("seasonal naive", "")
+    assert "n/a" in html

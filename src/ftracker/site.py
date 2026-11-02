@@ -5,7 +5,7 @@ from __future__ import annotations
 import html
 import json
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -24,7 +24,7 @@ def _e(x: object) -> str:
 
 
 def _num(v: float) -> str:
-    if v is None or (isinstance(v, float) and math.isnan(v)):
+    if v is None or pd.isna(v) or not math.isfinite(v):
         return "n/a"
     return f"{v:,.0f}" if abs(v) >= 100 else f"{v:.2f}"
 
@@ -36,13 +36,29 @@ def _unit(name: str) -> str:
     return ""
 
 
-def _read_status(root: Path) -> dict | None:
+def _read_status(root: Path) -> tuple[dict | None, str]:
+    """Return (status, problem). problem is "missing" or "unreadable" when status is None."""
+    path = Path(root) / "status.json"
+    if not path.is_file():
+        return None, "missing"
     try:
-        doc = json.loads((Path(root) / "status.json").read_text(encoding="utf-8"))
+        doc = json.loads(path.read_text(encoding="utf-8"))
         datetime.fromisoformat(doc["last_run"])
-        return doc
     except (OSError, ValueError, KeyError, TypeError):
-        return None
+        return None, "unreadable"
+    return doc, ""
+
+
+def _entries(status: dict | None) -> dict:
+    series = (status or {}).get("series")
+    if not isinstance(series, dict):
+        return {}
+    return {k: v for k, v in series.items() if isinstance(v, dict)}
+
+
+def _heading(name: str, unit: str) -> str:
+    u = f' <span class="unit">({_e(unit)})</span>' if unit else ""
+    return f"<h3>{_e(name)}{u}</h3>"
 
 
 def _utc(dt: datetime) -> datetime:
@@ -74,12 +90,17 @@ def _backtest_board(root: Path, name: str) -> pd.DataFrame | None:
 
 # ---------- charts ----------
 
-def _fan_chart(rows: pd.DataFrame, label: str) -> str:
-    """Model point with 80% band, baselines as dashed lines, over the 7 target days."""
-    w, h, left, right, top, bottom = 600, 210, 60, 14, 12, 34
+def _fan_chart(rows: pd.DataFrame, label: str, unit: str = "") -> str:
+    """Model point with 80% band, baselines as dashed lines, over the 7 target days.
+
+    Points whose values are not finite are skipped, so no "nan" reaches the SVG."""
+    w, h, left, right, top, bottom = 600, 220, 72, 26, 28, 36
+    rows = rows[rows["point"].map(math.isfinite)]
     series = {m: rows[rows["method"] == m].sort_values("horizon") for m in METHODS}
-    vals = [v for m in METHODS for col in ("point", "lo", "hi") for v in series[m][col]
-            if m == "model" or col == "point"]
+    band = series["model"][series["model"]["lo"].map(math.isfinite) & series["model"]["hi"].map(math.isfinite)]
+    vals = [v for m in METHODS for v in series[m]["point"]] + list(band["lo"]) + list(band["hi"])
+    if not vals:
+        return '<p class="muted">no finite forecast values to chart</p>'
     lo, hi = min(vals), max(vals)
     if hi - lo < 1e-9:
         lo, hi = lo - 1, hi + 1
@@ -95,14 +116,15 @@ def _fan_chart(rows: pd.DataFrame, label: str) -> str:
     def y(v: float) -> float:
         return top + (h - top - bottom) * (1 - (v - lo) / (hi - lo))
 
-    parts = [f'<svg class="chart" viewBox="0 0 {w} {h}" role="img" aria-label="{_e(label)}">']
+    parts = [f'<svg class="chart" viewBox="0 0 {w} {h}" role="img" aria-label="{_e(label)}">',
+             f'<text class="tick" x="2" y="18">{_e(unit)}</text>']
     for v in (lo + pad, hi - pad):
         parts.append(f'<line class="grid" x1="{left}" x2="{w - right}" y1="{y(v):.1f}" y2="{y(v):.1f}"/>'
                      f'<text class="tick" x="{left - 6}" y="{y(v) + 4:.1f}" text-anchor="end">{_num(v)}</text>')
     m = series["model"]
-    if len(m):
-        upper = [f"{x(int(r.horizon)):.1f},{y(r.hi):.1f}" for r in m.itertuples()]
-        lower = [f"{x(int(r.horizon)):.1f},{y(r.lo):.1f}" for r in reversed(list(m.itertuples()))]
+    if len(band) > 1:
+        upper = [f"{x(int(r.horizon)):.1f},{y(r.hi):.1f}" for r in band.itertuples()]
+        lower = [f"{x(int(r.horizon)):.1f},{y(r.lo):.1f}" for r in reversed(list(band.itertuples()))]
         parts.append(f'<polygon class="band" points="{" ".join(upper + lower)}"/>')
     for method in ("seasonal_naive", "persistence"):
         b = series[method]
@@ -128,25 +150,26 @@ def _legend(model_label: str = "model") -> str:
 
 def _trend_chart(dom_id: str, errors: pd.Series) -> str:
     w, h = 140, 34
-    vals = list(errors)
-    top = max(vals) or 1.0
+    vals = [v for v in errors if math.isfinite(v)]
+    top = max(vals, default=0.0) or 1.0
     n = len(vals)
-    pts = " ".join(f"{2 + (w - 4) * i / (n - 1):.1f},{h - 3 - (h - 6) * v / top:.1f}" for i, v in enumerate(vals))
+    pts = " ".join(f"{2 + (w - 4) * i / max(n - 1, 1):.1f},{h - 3 - (h - 6) * v / top:.1f}" for i, v in enumerate(vals))
     return (f'<svg id="{_e(dom_id)}" class="trend" viewBox="0 0 {w} {h}" role="img" '
             f'aria-label="absolute error over time, {n} forecasts, max {_num(top)}">'
             f'<polyline class="line model" points="{pts}"/></svg>')
 
 
-def _mae_bars(board: pd.DataFrame, label: str) -> str:
-    sub = board[board["mae"].notna()]
+def _mae_bars(board: pd.DataFrame, label: str, unit: str = "") -> str:
+    sub = board[board["mae"].map(lambda v: pd.notna(v) and math.isfinite(v))]
     if sub.empty:
         return '<p class="muted">no scored forecasts yet</p>'
     horizons = sorted(sub["horizon"].unique())
     top = float(sub["mae"].max()) or 1.0
-    w, h, left, bottom, top_pad = 600, 210, 60, 34, 14
+    w, h, left, bottom, top_pad = 600, 232, 72, 36, 44
     group = (w - left - 10) / len(horizons)
     bar = min(18.0, group / 4)
     parts = [f'<svg class="chart" viewBox="0 0 {w} {h}" role="img" aria-label="{_e(label)}">',
+             f'<text class="tick" x="2" y="18">MAE ({_e(unit)})</text>',
              f'<line class="grid" x1="{left}" x2="{w - 10}" y1="{h - bottom}" y2="{h - bottom}"/>',
              f'<text class="tick" x="{left - 6}" y="{top_pad + 4}" text-anchor="end">{_num(top)}</text>',
              f'<text class="tick" x="{left - 6}" y="{h - bottom + 4}" text-anchor="end">0</text>']
@@ -160,7 +183,7 @@ def _mae_bars(board: pd.DataFrame, label: str) -> str:
             bh = (h - bottom - top_pad) * v / top
             parts.append(f'<rect class="bar {method}" x="{gx + bar * mi:.1f}" y="{h - bottom - bh:.1f}" '
                          f'width="{bar - 2:.1f}" height="{bh:.1f}"><title>{METHOD_LABEL[method]} h{hz}: '
-                         f'MAE {_num(v)}, n={int(r["n"].iloc[0])}</title></rect>')
+                         f'MAE {_num(v)} {_e(unit)}, n={int(r["n"].iloc[0])}</title></rect>')
         parts.append(f'<text class="tick" x="{left + group * gi + group / 2:.1f}" y="{h - 10}" '
                      f'text-anchor="middle">+{hz}d</text>')
     parts.append("</svg>")
@@ -175,19 +198,28 @@ def _status_note(entry: dict | None) -> str:
     return ""
 
 
-def _upcoming(name: str, fc: pd.DataFrame, entry: dict | None, unit: str) -> str:
-    out = [f'<article class="card"><h3>{_e(name)}{f" <span class=unit>({_e(unit)})</span>" if unit else ""}</h3>',
-           _status_note(entry)]
+def _upcoming(name: str, fc: pd.DataFrame, entry: dict | None, unit: str, today: date,
+              newest_gap: date | None) -> str:
+    out = ['<article class="card">', _heading(name, unit), _status_note(entry)]
     if fc.empty:
         out.append('<p class="muted">no data yet</p></article>')
         return "".join(out)
     latest = fc[fc["issue_date"] == fc["issue_date"].max()]
-    out.append(f'<p class="muted">issued {latest["issue_date"].iloc[0].isoformat()}</p>')
-    out.append(_fan_chart(latest, f"{name} forecast for the next days"))
+    issued = latest["issue_date"].iloc[0]
+    out.append(f'<p class="muted">issued {issued.isoformat()}</p>')
+    models = latest[latest["method"] == "model"]
+    past = int((models["target_date"] < today).sum())
+    if past:
+        which = "targets in the past" if past == len(models) else f"{past} of {len(models)} targets in the past"
+        out.append(f'<p class="note bad">last forecast issued {(today - issued).days} days ago; {which}</p>')
+    if newest_gap is not None and newest_gap > issued:
+        out.append(f'<p class="note bad">no forecast since {issued.isoformat()}; newer gap on '
+                   f'{newest_gap.isoformat()}</p>')
+    out.append(_fan_chart(latest, f"{name} forecast for the next days", unit))
     out.append(_legend("model (line, 80% band)"))
     unit_h = _e(unit) if unit else "units"
     out.append(f'<div class="scroll"><table><thead><tr><th>Day</th><th>Model, 80% interval ({unit_h})</th>'
-               '<th>Seasonal naive</th><th>Persistence</th></tr></thead><tbody>')
+               f'<th>Seasonal naive ({unit_h})</th><th>Persistence ({unit_h})</th></tr></thead><tbody>')
     piv = {m: latest[latest["method"] == m].set_index("horizon") for m in METHODS}
     for hz in sorted(piv["model"].index):
         m = piv["model"].loc[hz]
@@ -196,7 +228,9 @@ def _upcoming(name: str, fc: pd.DataFrame, entry: dict | None, unit: str) -> str
             p = piv[method]
             return _num(p.loc[hz, "point"]) if hz in p.index else "n/a"
 
-        out.append(f'<tr data-up-row="{_e(name)}-h{hz}"><td>{m["target_date"].isoformat()} (+{hz}d)</td>'
+        is_past = m["target_date"] < today
+        out.append(f'<tr data-up-row="{_e(name)}-h{hz}"{" class=past" if is_past else ""}>'
+                   f'<td><span class="d">{m["target_date"].isoformat()}</span> <span class="muted">(+{hz}d){", past" if is_past else ""}</span></td>'
                    f'<td class="m"><strong>{_num(m["point"])}</strong> <span class="muted">{_num(m["lo"])} to {_num(m["hi"])}</span></td>'
                    f'<td>{base("seasonal_naive")}</td><td>{base("persistence")}</td></tr>')
     out.append("</tbody></table></div></article>")
@@ -208,7 +242,8 @@ def _skill_cell(row: pd.Series) -> str:
     return f'{"n/a" if pd.isna(sk) else f"{sk:.2f}"} (n={int(row["n_skill"])})'
 
 
-def _score_table(name: str, board: pd.DataFrame, fc: pd.DataFrame, oc: pd.DataFrame, trends: bool) -> str:
+def _score_table(name: str, board: pd.DataFrame, fc: pd.DataFrame, oc: pd.DataFrame, trends: bool,
+                 unit: str = "") -> str:
     model = board[board["method"] == "model"].sort_values("horizon")
     attr = "data-row" if trends else "data-bt-row"
     rows = []
@@ -217,7 +252,8 @@ def _score_table(name: str, board: pd.DataFrame, fc: pd.DataFrame, oc: pd.DataFr
         extra = ""
         if trends:
             if r.n >= MIN_TREND:
-                m = fc[(fc["method"] == "model") & (fc["horizon"] == hz)].merge(oc, on="target_date")
+                od = oc[["target_date", "value"]].drop_duplicates("target_date", keep="last")
+                m = fc[(fc["method"] == "model") & (fc["horizon"] == hz)].merge(od, on="target_date")
                 m = m[m["value"].notna()].sort_values("target_date")
                 extra = _trend_chart(f"trend-{name}-h{hz}", (m["value"] - m["point"]).abs().reset_index(drop=True))
             else:
@@ -226,7 +262,8 @@ def _score_table(name: str, board: pd.DataFrame, fc: pd.DataFrame, oc: pd.DataFr
         rows.append(f'<tr {attr}="{_e(name)}-h{hz}"><td>+{hz}d</td><td>{int(r.n)}</td><td>{_num(r.mae)}</td>'
                     f'<td>{cov}</td><td>{_skill_cell(pd.Series(r._asdict()))}</td>'
                     + (f"<td>{extra}</td>" if trends else "") + "</tr>")
-    head = "<th>Horizon</th><th>n</th><th>MAE</th><th>Coverage (80%)</th><th>Skill (n)</th>"
+    mae_h = f"MAE ({_e(unit)})" if unit else "MAE"
+    head = f"<th>Horizon</th><th>n</th><th>{mae_h}</th><th>Coverage (80%)</th><th>Skill (n)</th>"
     head += "<th>Trend</th>" if trends else ""
     return f'<div class="scroll"><table><thead><tr>{head}</tr></thead><tbody>{"".join(rows)}</tbody></table></div>'
 
@@ -255,18 +292,18 @@ th:first-child,td:first-child{text-align:left}
 th{font-weight:600;color:var(--muted)}
 svg.chart{display:block;width:100%;height:auto;max-width:600px;margin:6px 0}
 svg.trend{width:120px;height:30px;vertical-align:middle}
-.grid{stroke:var(--line);stroke-width:1}.tick{fill:var(--muted);font-size:16px}
+.grid{stroke:var(--line);stroke-width:1}.tick{fill:var(--muted);font-size:21px}
 .band{fill:var(--band)}.line{fill:none;stroke-width:2;stroke-linejoin:round}
 .line.model{stroke:var(--accent)}.line.seasonal_naive{stroke:var(--seasonal_naive);stroke-dasharray:5 3}
 .line.persistence{stroke:var(--persistence);stroke-dasharray:2 3}
 .dot{fill:var(--accent)}.bar.model{fill:var(--accent)}.bar.seasonal_naive{fill:var(--seasonal_naive)}
 .bar.persistence{fill:var(--persistence)}
-.legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:.85rem;color:var(--muted);margin:2px 0 10px}
+tr.past td{color:var(--muted)}.legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:.85rem;color:var(--muted);margin:2px 0 10px}
 .key::before{content:"";display:inline-block;width:14px;height:0;border-top:3px solid;margin-right:6px;vertical-align:middle}
 .key.model::before{border-color:var(--accent)}.key.seasonal_naive::before{border-color:var(--seasonal_naive)}
 .key.persistence::before{border-color:var(--persistence)}
 td.m{white-space:normal}td.m .muted{display:block;white-space:nowrap;margin:0;font-size:.85em}
-@media (max-width:480px){table{font-size:.85rem}th{white-space:normal;vertical-align:bottom}td.m{min-width:0}svg.trend{width:56px}th,td{padding:6px 4px}td:first-child{white-space:normal}main{padding-top:16px}h1{font-size:1.35rem}.card{padding:10px}}
+@media (max-width:480px){table{font-size:.85rem}th{white-space:normal;vertical-align:bottom}td.m{min-width:0}svg.trend{width:48px}th,td{padding:6px 3px}td:first-child{white-space:normal}.d{white-space:nowrap}td .muted{font-size:.8em}main{padding-top:16px}h1{font-size:1.35rem}.card{padding:10px}}
 """
 
 
@@ -282,12 +319,13 @@ def _gap_line(name: str, root: Path) -> str:
 def build_site(root: Path, out_dir: Path, now: datetime, series_names: list[str]) -> Path:
     root, out_dir = Path(root), Path(out_dir)
     now = _utc(now)
-    status = _read_status(root)
-    entries = (status or {}).get("series", {})
+    status, problem = _read_status(root)
+    entries = _entries(status)
+    today = now.date()
 
     banner, last_run_txt = "", "never"
     if status is None:
-        banner = '<div class="banner" role="alert"><strong>STALE</strong> no run recorded yet (status.json is missing).</div>'
+        banner = f'<div class="banner" role="alert"><strong>STALE</strong> no run recorded yet (status.json is {problem}).</div>'
     else:
         last = _utc(datetime.fromisoformat(status["last_run"]))
         last_run_txt = last.strftime("%Y-%m-%d %H:%M UTC")
@@ -301,27 +339,34 @@ def build_site(root: Path, out_dir: Path, now: datetime, series_names: list[str]
         data[name] = (store.read_forecasts(root, name), store.read_outcomes(root, name))
     boards = {n: scoring.scoreboard(n, fc, oc) for n, (fc, oc) in data.items()}
 
-    upcoming = "".join(_upcoming(n, data[n][0], entries.get(n), _unit(n)) for n in series_names)
+    units = {n: _unit(n) for n in series_names}
+
+    def newest_gap(n: str):
+        g = store.read_gaps(root, n)
+        return None if g.empty else g["issue_date"].max()
+
+    upcoming = "".join(_upcoming(n, data[n][0], entries.get(n), units[n], today, newest_gap(n))
+                       for n in series_names)
 
     score_cards = []
     for n in series_names:
         fc, oc = data[n]
-        card = [f'<article class="card"><h3>{_e(n)}</h3>', _status_note(entries.get(n))]
+        card = ['<article class="card">', _heading(n, units[n]), _status_note(entries.get(n))]
         if boards[n].empty:
             card.append('<p class="muted">no data yet</p>')
         else:
-            card.append(_score_table(n, boards[n], fc, oc, trends=True))
+            card.append(_score_table(n, boards[n], fc, oc, trends=True, unit=units[n]))
             card.append(_gap_line(n, root))
         card.append("</article>")
         score_cards.append("".join(card))
 
     compare = []
     for n in series_names:
-        compare.append(f'<article class="card"><h3>{_e(n)}</h3>')
+        compare.append('<article class="card">' + _heading(n, units[n]))
         if boards[n].empty:
             compare.append('<p class="muted">no data yet</p>')
         else:
-            compare.append(_mae_bars(boards[n], f"{n}: mean absolute error by horizon, model vs baselines"))
+            compare.append(_mae_bars(boards[n], f"{n}: mean absolute error by horizon, model vs baselines", units[n]))
             compare.append(_legend("model"))
             compare.append('<p class="muted">Mean absolute error per horizon, lower is better. Skill is '
                            'shown in the scoreboard above.</p>')
@@ -329,10 +374,17 @@ def build_site(root: Path, out_dir: Path, now: datetime, series_names: list[str]
 
     backtest = []
     for n in series_names:
-        bb = _backtest_board(root, n)
+        try:
+            bb = _backtest_board(root, n)
+        except Exception:  # unusable file: say so, never break the deploy
+            backtest.append('<article class="card">' + _heading(n, units[n]) + '<p class="note bad">backtest file '
+                            'is unreadable or lacks required columns (origin, method, target_date, horizon, '
+                            'point, lo, hi, actual)</p></article>')
+            continue
         if bb is not None and not bb.empty:
-            backtest.append(f'<article class="card"><h3>{_e(n)}</h3>'
-                            + _score_table(n, bb, pd.DataFrame(), pd.DataFrame(), trends=False) + "</article>")
+            backtest.append('<article class="card">' + _heading(n, units[n])
+                            + _score_table(n, bb, pd.DataFrame(), pd.DataFrame(), trends=False, unit=units[n])
+                            + "</article>")
     backtest_html = ""
     if backtest:
         backtest_html = (f"<h2>{BACKTEST_TITLE}</h2>"
@@ -357,6 +409,7 @@ def build_site(root: Path, out_dir: Path, now: datetime, series_names: list[str]
 {backtest_html}
 </main></body></html>
 """
+    page = page.replace("<th>", '<th scope="col">')
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / "index.html"
     path.write_text(page, encoding="utf-8")
