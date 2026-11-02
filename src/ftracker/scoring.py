@@ -27,7 +27,7 @@ def skill(model_mae: float, baseline_mae: float) -> float | None:
 
 
 def scoreboard(series: str, forecasts: pd.DataFrame, outcomes: pd.DataFrame) -> pd.DataFrame:
-    """One row per (method, horizon) with n, n_missing, mae, coverage, skill.
+    """One row per (method, horizon) with n, n_missing, mae, coverage, skill, n_skill.
 
     Forecasts are left-joined to outcomes on target_date. A forecast with no
     outcome row yet is not counted at all; one whose outcome value is NaN counts

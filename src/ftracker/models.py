@@ -143,7 +143,7 @@ class SeasonalNaive(_Base):
 
 
 class GBMForecaster(_Base):
-    """One LightGBM model per lead 1..8 on lag features (lags 1-14, day of week, day of year).
+    """One LightGBM model per lead 1..10 (MAX_LEAD) on lags 1-14, day of week and day of year.
 
     The target is y[origin+lead] - y[origin] (change from the last value, so level shifts
     need no extrapolation); the last value is added back.  Lags are raw values.  Models are

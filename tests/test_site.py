@@ -456,3 +456,20 @@ def test_about_says_commit_time_is_the_timestamp_of_record(tmp_path, monkeypatch
 def test_about_skips_unknown_series_and_escapes(tmp_path, monkeypatch):
     about = _about_html(tmp_path, monkeypatch, names=("a&b",))
     assert "a&b" not in about and "<li><strong>" not in about.split("Sources")[0]
+
+
+# ---------- cold start ----------
+
+def test_days_tracked_and_gap_days_per_series(tmp_path):
+    root, page = build(tmp_path, names=("s1", "s2"))
+    make_data(root, "s1", issues=4)
+    store.write_gap(root, "s1", date(2026, 9, 10), "source down")
+    store.write_gap(root, "s1", date(2026, 9, 11), "source down")
+    store.write_gap(root, "s2", date(2026, 9, 10), "no key")
+    write_status(root, NOW)
+    html = page()
+    up = html.split("<h2>Upcoming forecasts</h2>", 1)[1].split("<h2>", 1)[0]
+    s1 = up.split("<h3>s1</h3>", 1)[1].split("</article>", 1)[0]
+    s2 = up.split("<h3>s2</h3>", 1)[1].split("</article>", 1)[0]
+    assert "days tracked: 4; gap days: 2" in s1
+    assert "days tracked: 0; gap days: 1" in s2 and "no data yet" in s2

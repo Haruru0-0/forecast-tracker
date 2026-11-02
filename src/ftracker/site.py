@@ -204,15 +204,23 @@ def _status_note(entry: dict | None) -> str:
     return ""
 
 
+def _tracked(fc: pd.DataFrame, gaps: pd.DataFrame) -> str:
+    """Cold-start context: distinct issue dates with a forecast file, and gap days."""
+    days = fc["issue_date"].nunique() if not fc.empty else 0
+    gap_days = gaps["issue_date"].nunique() if not gaps.empty else 0
+    return f'<p class="muted tracked">days tracked: {days}; gap days: {gap_days}</p>'
+
+
 def _upcoming(name: str, fc: pd.DataFrame, entry: dict | None, unit: str, today: date,
-              newest_gap: date | None) -> str:
+              gaps: pd.DataFrame) -> str:
+    newest_gap = None if gaps.empty else gaps["issue_date"].max()
     if fc.empty:
         return "".join(['<article class="card">', _heading(name, unit), _status_note(entry),
-                        '<p class="muted">no data yet</p></article>'])
+                        '<p class="muted">no data yet</p>', _tracked(fc, gaps), "</article>"])
     latest = fc[fc["issue_date"] == fc["issue_date"].max()]
     issued = latest["issue_date"].iloc[0]
     out = [f'<article class="card" data-last-issue="{_e(issued.isoformat())}">', _heading(name, unit),
-           _status_note(entry), f'<p class="muted">issued {issued.isoformat()}</p>']
+           _status_note(entry), f'<p class="muted">issued {issued.isoformat()}</p>', _tracked(fc, gaps)]
     models = latest[latest["method"] == "model"]
     past = int((models["target_date"] < today).sum())
     if past:
@@ -454,11 +462,7 @@ def build_site(root: Path, out_dir: Path, now: datetime, series_names: list[str]
 
     units = {n: _unit(n) for n in series_names}
 
-    def newest_gap(n: str):
-        g = store.read_gaps(root, n)
-        return None if g.empty else g["issue_date"].max()
-
-    upcoming = "".join(_upcoming(n, data[n][0], entries.get(n), units[n], today, newest_gap(n))
+    upcoming = "".join(_upcoming(n, data[n][0], entries.get(n), units[n], today, store.read_gaps(root, n))
                        for n in series_names)
 
     score_cards = []
