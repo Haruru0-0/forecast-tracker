@@ -7,7 +7,7 @@ from collections.abc import Sequence
 import numpy as np
 import pandas as pd
 
-COLUMNS = ["series", "method", "horizon", "n", "n_missing", "mae", "coverage", "skill"]
+COLUMNS = ["series", "method", "horizon", "n", "n_missing", "mae", "coverage", "skill", "n_skill"]
 BASELINES = ("seasonal_naive", "persistence")
 
 
@@ -38,7 +38,10 @@ def scoreboard(series: str, forecasts: pd.DataFrame, outcomes: pd.DataFrame) -> 
     column stays numeric) when undefined: a baseline has no scored pairs or its
     MAE is <= 1e-9 (see skill()). It is computed per horizon on the paired set of
     (issue_date, target_date) scored for the model and both baselines, against
-    the lower baseline MAE.
+    the lower baseline MAE. n_skill is the size of that paired set, filled on
+    model rows (0 when a baseline has no rows or no pairs are shared, and 0 on
+    baseline rows); it can be smaller than n. When the baseline MAE is <= 1e-9,
+    skill is NaN but n_skill still reports the paired count.
     """
     if forecasts is None or forecasts.empty:
         return pd.DataFrame(columns=COLUMNS)
@@ -59,6 +62,7 @@ def scoreboard(series: str, forecasts: pd.DataFrame, outcomes: pd.DataFrame) -> 
             "mae": mae(s["value"], s["point"]) if n else np.nan,
             "coverage": coverage(s["value"], s["lo"], s["hi"]) if n else np.nan,
             "skill": np.nan,
+            "n_skill": 0,
         })
     board = pd.DataFrame(rows, columns=COLUMNS)
 
@@ -74,6 +78,8 @@ def scoreboard(series: str, forecasts: pd.DataFrame, outcomes: pd.DataFrame) -> 
             continue
         maes = {m: mae(p.loc[common, "value"], p.loc[common, "point"]) for m, p in parts.items()}
         sk = skill(maes["model"], min(maes[b] for b in BASELINES))
+        mask = (board["method"] == "model") & (board["horizon"] == int(horizon))
+        board.loc[mask, "n_skill"] = len(common)
         if sk is not None:
-            board.loc[(board["method"] == "model") & (board["horizon"] == int(horizon)), "skill"] = sk
+            board.loc[mask, "skill"] = sk
     return board

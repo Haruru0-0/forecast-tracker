@@ -5,7 +5,7 @@ import pandas as pd
 
 from ftracker.scoring import coverage, mae, scoreboard, skill
 
-COLS = ["series", "method", "horizon", "n", "n_missing", "mae", "coverage", "skill"]
+COLS = ["series", "method", "horizon", "n", "n_missing", "mae", "coverage", "skill", "n_skill"]
 
 
 def _fc(rows):
@@ -74,3 +74,44 @@ def test_forecast_without_outcome_is_not_counted():
 def test_empty_inputs():
     sb = scoreboard("s", pd.DataFrame(), pd.DataFrame())
     assert list(sb.columns) == COLS and sb.empty
+
+
+def _multi(rows):
+    # rows: (method, issue_day, target_day, point)
+    return pd.DataFrame(
+        [{"issue_date": date(2026, 1, i), "method": m, "target_date": date(2026, 1, t),
+          "horizon": 1, "point": p, "lo": 0.0, "hi": 10.0} for m, i, t, p in rows]
+    )
+
+
+def test_skill_uses_only_common_pairs():
+    fc = _multi([
+        ("model", 1, 2, 2.0), ("model", 2, 3, 2.0), ("model", 3, 4, 9.0),
+        ("seasonal_naive", 1, 2, 3.0), ("seasonal_naive", 2, 3, 3.0),
+        ("persistence", 1, 2, 5.0), ("persistence", 2, 3, 5.0),
+    ])
+    sb = scoreboard("s", fc, _out([(2, 1.0), (3, 1.0), (4, 1.0)]))
+    m = sb[sb.method == "model"].iloc[0]
+    assert m.n == 3 and m.n_skill == 2
+    assert m.skill == 0.5  # model MAE 1 on common pairs vs seasonal 2
+    assert (sb[sb.method != "model"].n_skill == 0).all()
+
+
+def test_missing_baseline_gives_nan_skill_and_zero_n_skill():
+    fc = _multi([("model", 1, 2, 2.0), ("seasonal_naive", 1, 2, 3.0)])
+    sb = scoreboard("s", fc, _out([(2, 1.0)]))
+    m = sb[sb.method == "model"].iloc[0]
+    assert np.isnan(m.skill) and m.n_skill == 0
+
+
+def test_zero_baseline_mae_gives_nan_skill_but_reports_n_skill():
+    fc = _multi([
+        ("model", 1, 2, 2.0), ("seasonal_naive", 1, 2, 1.0), ("persistence", 1, 2, 4.0),
+    ])
+    sb = scoreboard("s", fc, _out([(2, 1.0)]))
+    m = sb[sb.method == "model"].iloc[0]
+    assert np.isnan(m.skill) and m.n_skill == 1
+
+
+def test_coverage_boundaries_are_inclusive():
+    assert coverage([0, 2], [0, 0], [5, 2]) == 1.0
