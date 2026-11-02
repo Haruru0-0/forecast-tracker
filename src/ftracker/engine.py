@@ -25,7 +25,7 @@ from ftracker.models import (
     Persistence,
     SeasonalNaive,
 )
-from ftracker.series import Series, SourceError
+from ftracker.series import Series, SourceError, apply_floor
 
 HISTORY_DAYS = 730
 HORIZONS = range(1, 8)
@@ -115,6 +115,7 @@ def _issue(
         for f in forecasters:
             out = f.forecast(history, targets)
             frame = out.reset_index().rename(columns={out.index.name or "index": "target_date"})
+            frame = apply_floor(frame, series.lower_bound)
             frame["method"] = f.name
             frame["horizon"] = [(t - issue_date).days for t in frame["target_date"]]
             frames.append(frame[ROW_COLUMNS])

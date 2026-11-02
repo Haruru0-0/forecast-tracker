@@ -65,7 +65,7 @@ def backtest(series: str, days: int, step: int, data_dir: Path) -> int:
             first_origin = last_origin - timedelta(days=days)
             origins = [last_origin - timedelta(days=k) for k in range(0, days + 1, step)][::-1]
             history = s.fetch_daily(first_origin - timedelta(days=730), yesterday)
-            result = run_backtest(history, default_forecasters(), origins)
+            result = run_backtest(history, default_forecasters(), origins, s.lower_bound)
             out_dir.mkdir(parents=True, exist_ok=True)
             result.to_csv(out_dir / f"{s.name}.csv", index=False)
         except Exception as exc:  # one broken series must never stop the others; type and message only

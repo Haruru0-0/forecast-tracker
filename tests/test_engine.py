@@ -253,3 +253,32 @@ def test_default_forecasters_end_to_end(tmp_path):
     assert set(df.method) == {"seasonal_naive", "persistence", "model"} and len(df) == 21
     assert ((df.lo <= df.point) & (df.point <= df.hi)).all()
     assert time.time() - t0 < 30
+
+
+class Negative(Stub):
+    """Returns values below zero so the physical floor must be applied."""
+
+    def forecast(self, history, target_dates):
+        n = len(target_dates)
+        return pd.DataFrame(
+            {"point": [-1.0] * (n - 1) + [2.0], "lo": [-2.0] * (n - 1) + [1.0], "hi": [-0.5] * (n - 2) + [0.5, 3.0]},
+            index=pd.Index(list(target_dates), name="target_date"),
+        )
+
+
+def test_lower_bound_clips_point_lo_and_keeps_order(tmp_path):
+    base = make_series()
+    s = Series("s1", "u", "UTC", base.fetch_daily, lower_bound=0.0)
+    engine.issue_forecasts(tmp_path, s, ISSUE, NOW, "r1", [Negative()])
+    df = store.read_forecasts(tmp_path, "s1").sort_values("horizon")
+    assert (df.point >= 0).all() and (df.lo >= 0).all()
+    assert ((df.lo <= df.point) & (df.point <= df.hi)).all()
+    assert list(df.point) == [0.0] * 6 + [2.0]
+    assert list(df.hi) == [0.0] * 5 + [0.5, 3.0]
+    assert df.lo.iloc[-1] == 1.0  # values above the floor are left alone
+
+
+def test_no_lower_bound_leaves_values_alone(tmp_path):
+    engine.issue_forecasts(tmp_path, make_series(), ISSUE, NOW, "r1", [Negative()])
+    df = store.read_forecasts(tmp_path, "s1").sort_values("horizon")
+    assert df.point.iloc[0] == -1.0 and df.lo.iloc[0] == -2.0

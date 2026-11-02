@@ -41,7 +41,7 @@ def _tz() -> str:
 
 SERIES: dict[str, Series] = {
     "weather": Series("weather_tmax", "degC", _tz(), _weather),
-    "air_quality": Series("air_quality_aqi", "US AQI", _tz(), _air_quality),
-    "electricity": Series("electricity_peak_mw", "MW", _tz(), _electricity),
-    "river": Series("river_discharge_cfs", "ft3/s", _tz(), _river),
+    "air_quality": Series("air_quality_aqi", "US AQI", _tz(), _air_quality, lower_bound=0.0),
+    "electricity": Series("electricity_peak_mw", "MW", _tz(), _electricity, lower_bound=0.0),
+    "river": Series("river_discharge_cfs", "ft3/s", _tz(), _river, lower_bound=0.0),
 }

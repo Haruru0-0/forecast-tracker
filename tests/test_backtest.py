@@ -104,3 +104,29 @@ def test_cli_single_series_by_name(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "_today", lambda tz: START + timedelta(days=380))
     assert cli.main(["backtest", "--series", "toy", "--days", "14", "--data-dir", str(tmp_path)]) == 0
     assert cli.main(["backtest", "--series", "nope", "--data-dir", str(tmp_path)]) == 2
+
+
+class Below:
+    name = "below"
+
+    def forecast(self, history, target_dates):
+        return pd.DataFrame({"point": -1.0, "lo": -3.0, "hi": -0.5}, index=pd.Index(target_dates, name="target_date"))
+
+
+def test_backtest_applies_lower_bound():
+    origin = START + timedelta(days=100)
+    out = run_backtest(_history(), [Below()], [origin], lower_bound=0.0)
+    assert (out["point"] == 0.0).all() and (out["lo"] == 0.0).all() and (out["hi"] == 0.0).all()
+    raw = run_backtest(_history(), [Below()], [origin])
+    assert (raw["point"] == -1.0).all()
+
+
+def test_cli_backtest_passes_series_lower_bound(tmp_path, monkeypatch):
+    hist = _history(400)
+    series = Series("toy", "u", "UTC", lambda s, e: hist[(hist.index >= s) & (hist.index <= e)], lower_bound=0.0)
+    monkeypatch.setattr(cli, "SERIES", {"a": series})
+    monkeypatch.setattr(cli, "default_forecasters", lambda: [Below()])
+    monkeypatch.setattr(cli, "_today", lambda tz: START + timedelta(days=380))
+    assert cli.main(["backtest", "--series", "toy", "--days", "14", "--data-dir", str(tmp_path)]) == 0
+    out = pd.read_csv(tmp_path / "backtest" / "toy.csv")
+    assert (out["point"] >= 0).all() and (out["lo"] >= 0).all()

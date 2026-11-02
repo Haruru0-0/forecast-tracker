@@ -27,3 +27,8 @@ def test_registry_reads_config_at_call_time(monkeypatch):
     monkeypatch.setitem(config.METRO, "usgs_site", "99999999")
     registry.SERIES["river"].fetch_daily(date(2026, 10, 1), date(2026, 10, 2))
     assert seen["site"] == "99999999"
+
+
+def test_physical_floors():
+    floors = {k: s.lower_bound for k, s in registry.SERIES.items()}
+    assert floors == {"weather": None, "air_quality": 0.0, "electricity": 0.0, "river": 0.0}
