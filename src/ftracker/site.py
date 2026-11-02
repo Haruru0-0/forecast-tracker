@@ -1,4 +1,8 @@
-"""Static scoreboard page: one self-contained index.html with inline SVG charts, no scripts."""
+"""Static scoreboard page: one self-contained index.html with inline SVG charts.
+
+The page is correct without scripts at build time. A small inline script (no external files)
+re-checks staleness against the viewer's clock, because a page that stopped being rebuilt
+would otherwise keep its last "fresh" look forever."""
 
 from __future__ import annotations
 
@@ -200,18 +204,21 @@ def _status_note(entry: dict | None) -> str:
 
 def _upcoming(name: str, fc: pd.DataFrame, entry: dict | None, unit: str, today: date,
               newest_gap: date | None) -> str:
-    out = ['<article class="card">', _heading(name, unit), _status_note(entry)]
     if fc.empty:
-        out.append('<p class="muted">no data yet</p></article>')
-        return "".join(out)
+        return "".join(['<article class="card">', _heading(name, unit), _status_note(entry),
+                        '<p class="muted">no data yet</p></article>'])
     latest = fc[fc["issue_date"] == fc["issue_date"].max()]
     issued = latest["issue_date"].iloc[0]
-    out.append(f'<p class="muted">issued {issued.isoformat()}</p>')
+    out = [f'<article class="card" data-last-issue="{_e(issued.isoformat())}">', _heading(name, unit),
+           _status_note(entry), f'<p class="muted">issued {issued.isoformat()}</p>']
     models = latest[latest["method"] == "model"]
     past = int((models["target_date"] < today).sum())
     if past:
         which = "targets in the past" if past == len(models) else f"{past} of {len(models)} targets in the past"
-        out.append(f'<p class="note bad">last forecast issued {(today - issued).days} days ago; {which}</p>')
+        out.append(f'<p class="note bad" data-past-note>last forecast issued {(today - issued).days} days ago; '
+                   f'{which}</p>')
+    else:
+        out.append('<p class="note bad" data-past-note hidden></p>')
     if newest_gap is not None and newest_gap > issued:
         out.append(f'<p class="note bad">no forecast since {issued.isoformat()}; newer gap on '
                    f'{newest_gap.isoformat()}</p>')
@@ -229,7 +236,8 @@ def _upcoming(name: str, fc: pd.DataFrame, entry: dict | None, unit: str, today:
             return _num(p.loc[hz, "point"]) if hz in p.index else "n/a"
 
         is_past = m["target_date"] < today
-        out.append(f'<tr data-up-row="{_e(name)}-h{hz}"{" class=past" if is_past else ""}>'
+        out.append(f'<tr data-up-row="{_e(name)}-h{hz}" data-target="{_e(m["target_date"].isoformat())}"'
+                   f'{" class=past" if is_past else ""}>'
                    f'<td><span class="d">{m["target_date"].isoformat()}</span> <span class="muted">(+{hz}d){", past" if is_past else ""}</span></td>'
                    f'<td class="m"><strong>{_num(m["point"])}</strong> <span class="muted">{_num(m["lo"])} to {_num(m["hi"])}</span></td>'
                    f'<td>{base("seasonal_naive")}</td><td>{base("persistence")}</td></tr>')
@@ -307,6 +315,55 @@ td.m{white-space:normal}td.m .muted{display:block;white-space:nowrap;margin:0;fo
 """
 
 
+# Re-checks staleness with the viewer's clock. Uses only textContent, classList and hidden;
+# never innerHTML. The page data reaches it only through data attributes.
+SCRIPT = """
+(function () {
+  "use strict";
+  var HOUR = 3600000, DAY = 86400000, STALE_AFTER = 36 * HOUR;
+  var now = Date.now();
+  var today = new Date(now).toISOString().slice(0, 10);
+  var banner = document.getElementById("stale-banner");
+  if (banner) {
+    var last = Date.parse(banner.getAttribute("data-last-run") || "");
+    if (Number.isFinite(last) && now - last > STALE_AFTER) {
+      var strong = document.createElement("strong");
+      strong.textContent = "STALE";
+      banner.textContent = "";
+      banner.appendChild(strong);
+      banner.appendChild(document.createTextNode(" the last run was " + Math.floor((now - last) / HOUR) +
+        " hours ago; scores below may be out of date."));
+      banner.hidden = false;
+    }
+  }
+  var cards = document.querySelectorAll("[data-last-issue]");
+  for (var i = 0; i < cards.length; i++) {
+    var card = cards[i], issued = card.getAttribute("data-last-issue") || "";
+    var rows = card.querySelectorAll("tr[data-target]"), past = 0;
+    for (var j = 0; j < rows.length; j++) {
+      var row = rows[j];
+      if ((row.getAttribute("data-target") || "") < today) {
+        past++;
+        if (!row.classList.contains("past")) {
+          row.classList.add("past");
+          var label = row.querySelector("td .muted");
+          if (label) { label.textContent = label.textContent + ", past"; }
+        }
+      }
+    }
+    var note = card.querySelector("[data-past-note]");
+    var issuedMs = Date.parse(issued + "T00:00:00Z");
+    if (past && note && Number.isFinite(issuedMs)) {
+      var days = Math.round((Date.parse(today + "T00:00:00Z") - issuedMs) / DAY);
+      var which = past === rows.length ? "targets in the past" : past + " of " + rows.length + " targets in the past";
+      note.textContent = "last forecast issued " + days + " days ago; " + which;
+      note.hidden = false;
+    }
+  }
+})();
+"""
+
+
 def _gap_line(name: str, root: Path) -> str:
     gaps = store.read_gaps(root, name)
     if gaps.empty:
@@ -323,16 +380,20 @@ def build_site(root: Path, out_dir: Path, now: datetime, series_names: list[str]
     entries = _entries(status)
     today = now.date()
 
-    banner, last_run_txt = "", "never"
+    last_run_txt = "never"
     if status is None:
-        banner = f'<div class="banner" role="alert"><strong>STALE</strong> no run recorded yet (status.json is {problem}).</div>'
+        banner = ('<div id="stale-banner" class="banner" role="alert" data-last-run="">'
+                  f'<strong>STALE</strong> no run recorded yet (status.json is {_e(problem)}).</div>')
     else:
         last = _utc(datetime.fromisoformat(status["last_run"]))
         last_run_txt = last.strftime("%Y-%m-%d %H:%M UTC")
+        attr = f'id="stale-banner" class="banner" role="alert" data-last-run="{_e(last.isoformat())}"'
         if now - last > STALE_AFTER:
             hours = int((now - last).total_seconds() // 3600)
-            banner = (f'<div class="banner" role="alert"><strong>STALE</strong> the last run was {hours} hours ago; '
+            banner = (f'<div {attr}><strong>STALE</strong> the last run was {hours} hours ago; '
                       'scores below may be out of date.</div>')
+        else:  # hidden, and filled in by the script once the viewer's clock says it is stale
+            banner = f"<div {attr} hidden></div>"
 
     data = {}
     for name in series_names:
@@ -407,7 +468,9 @@ def build_site(root: Path, out_dir: Path, now: datetime, series_names: list[str]
 {"".join(score_cards)}
 <h2>Model vs baseline</h2>{"".join(compare)}
 {backtest_html}
-</main></body></html>
+</main>
+<script>{SCRIPT}</script>
+</body></html>
 """
     page = page.replace("<th>", '<th scope="col">')
     out_dir.mkdir(parents=True, exist_ok=True)

@@ -29,7 +29,7 @@ def test_check_sources_survives_non_source_error(monkeypatch, capsys):
 def test_site_command_writes_page(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "SERIES", {"a": Series("first", "u", "America/Chicago", lambda s, e: None)})
     assert cli.main(["site", "--data-dir", str(tmp_path / "data"), "--out", str(tmp_path / "site")]) == 0
-    assert "STALE" in (tmp_path / "site" / "index.html").read_text(encoding="utf-8")
+    assert "<strong>STALE</strong>" in (tmp_path / "site" / "index.html").read_text(encoding="utf-8")
 
 
 def test_site_command_writes_scoreboard_csv(tmp_path, monkeypatch):

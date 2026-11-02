@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import date, datetime, timedelta, timezone
 
 import pandas as pd
@@ -38,6 +39,11 @@ def write_status(root, last_run, series=None):
     (root / "status.json").write_text(json.dumps({"last_run": last_run.isoformat(), "series": series or {}}))
 
 
+def _markup(html):
+    """The server-rendered page without the inline script, whose source names the texts it may show."""
+    return re.sub(r"<script>.*?</script>", "", html, flags=re.S)
+
+
 def build(tmp_path, names=("s1",), now=NOW):
     root = tmp_path / "data"
     root.mkdir(exist_ok=True)
@@ -51,17 +57,17 @@ def test_page_shows_last_run_time(tmp_path):
     write_status(root, last)
     html = page()
     assert "2026-11-02 07:00 UTC" in html
-    assert "STALE" not in html
+    assert "STALE" not in _markup(html)
 
 
 def test_stale_banner_after_36_hours(tmp_path):
     root, page = build(tmp_path)
     make_data(root, issues=3)
     write_status(root, NOW - timedelta(hours=37))
-    assert "STALE" in page()
+    assert "STALE" in _markup(page())
     (root / "status.json").unlink()
     write_status(root, NOW - timedelta(hours=35))
-    assert "STALE" not in page()
+    assert "STALE" not in _markup(page())
 
 
 def test_below_14_scored_shows_count_and_no_trend(tmp_path):
@@ -144,7 +150,7 @@ def test_backtest_section_labelled_and_only_when_present(tmp_path):
 def test_site_builds_with_no_data_and_shows_stale_banner(tmp_path):
     root, page = build(tmp_path, names=("s1", "s2"))
     html = page()
-    assert "STALE" in html
+    assert "STALE" in _markup(html)
     for name in ("s1", "s2"):
         card = html.split(f"<h3>{name}</h3>", 1)[1].split("</article>", 1)[0]
         assert "no data yet" in card
@@ -207,18 +213,18 @@ def test_all_scoreboards_concatenates_series(tmp_path):
 def test_stale_boundary_is_exactly_36_hours(tmp_path):
     root, page = build(tmp_path)
     write_status(root, NOW - timedelta(hours=36))
-    assert "STALE" not in page()
+    assert "STALE" not in _markup(page())
     write_status(root, NOW - timedelta(hours=36, seconds=1))
-    assert "STALE" in page()
+    assert "STALE" in _markup(page())
 
 
 def test_naive_last_run_is_treated_as_utc(tmp_path):
     root, page = build(tmp_path)
     (root / "status.json").write_text(json.dumps({"last_run": "2026-11-02T00:00:00", "series": {}}))
     html = page()
-    assert "2026-11-02 00:00 UTC" in html and "STALE" not in html
+    assert "2026-11-02 00:00 UTC" in html and "STALE" not in _markup(html)
     (root / "status.json").write_text(json.dumps({"last_run": "2026-10-31T00:00:00", "series": {}}))
-    assert "STALE" in page()
+    assert "STALE" in _markup(page())
 
 
 def test_corrupt_status_json_says_unreadable_and_is_stale(tmp_path):
@@ -227,7 +233,7 @@ def test_corrupt_status_json_says_unreadable_and_is_stale(tmp_path):
     for bad in ("{not json", "[1, 2]", '"text"', json.dumps({"series": {}}), json.dumps({"last_run": 5})):
         (root / "status.json").write_text(bad)
         html = page()
-        assert "STALE" in html and "status.json is unreadable" in html
+        assert "STALE" in _markup(html) and "status.json is unreadable" in html
 
 
 def test_status_with_malformed_series_does_not_crash(tmp_path):
@@ -236,7 +242,7 @@ def test_status_with_malformed_series_does_not_crash(tmp_path):
     for series in ([], "oops", {"s1": "oops"}, {"s1": ["x"]}, {"s1": None}):
         (root / "status.json").write_text(json.dumps({"last_run": NOW.isoformat(), "series": series}))
         html = page()
-        assert "STALE" not in html and "no forecast issued" not in html
+        assert "STALE" not in _markup(html) and "no forecast issued" not in html
 
 
 def test_old_forecast_is_flagged_not_hidden(tmp_path):
@@ -258,7 +264,7 @@ def test_fresh_forecast_has_no_past_flag(tmp_path):
     write_status(root, NOW)
     # issue 2026-09-01 vs now 2026-11-02 is old; use a now right after the issue instead
     html = site.build_site(root, tmp_path / "o2", datetime(2026, 9, 2, 8, tzinfo=timezone.utc), ["s1"]).read_text(encoding="utf-8")
-    assert "targets in the past" not in html
+    assert "targets in the past" not in _markup(html)
 
 
 def test_units_in_headings_headers_and_charts(tmp_path, monkeypatch):
@@ -321,3 +327,70 @@ def test_nan_forecast_values_never_reach_the_page(tmp_path):
     html = page()
     assert "nan" not in html.lower().replace("seasonal naive", "")
     assert "n/a" in html
+
+
+# ---------- client-side stale check (the page may stop being rebuilt) ----------
+
+def _banner(html):
+    m = re.search(r'<div id="stale-banner"[^>]*>', html)
+    assert m, "banner container missing"
+    return m.group(0)
+
+
+def test_banner_container_is_hidden_when_fresh_and_carries_last_run(tmp_path):
+    root, page = build(tmp_path)
+    make_data(root, issues=3)
+    write_status(root, NOW - timedelta(hours=5))
+    tag = _banner(page())
+    assert " hidden" in tag
+    assert f'data-last-run="{(NOW - timedelta(hours=5)).isoformat()}"' in tag
+
+
+def test_banner_container_is_visible_when_stale(tmp_path):
+    root, page = build(tmp_path)
+    write_status(root, NOW - timedelta(days=3))
+    html = page()
+    tag = _banner(html)
+    assert "hidden" not in tag and 'data-last-run="2026-10-30T12:00:00+00:00"' in tag
+    assert "the last run was 72 hours ago" in _markup(html)
+    (root / "status.json").unlink()
+    tag = _banner(page())
+    assert "hidden" not in tag and 'data-last-run=""' in tag
+
+
+def test_rows_and_cards_carry_dates_for_the_script(tmp_path):
+    root, page = build(tmp_path)
+    make_data(root, issues=3)
+    write_status(root, NOW)
+    html = page()
+    last_issue = D0 + timedelta(days=2)
+    assert f'data-last-issue="{last_issue.isoformat()}"' in html
+    for h in range(1, 8):
+        assert f'data-target="{(last_issue + timedelta(days=h)).isoformat()}"' in html
+    assert _markup(html).count("data-past-note") == 1
+
+
+def test_past_note_placeholder_is_hidden_when_nothing_is_past(tmp_path):
+    root, _ = build(tmp_path)
+    make_data(root, issues=1)
+    write_status(root, NOW)
+    html = site.build_site(root, tmp_path / "o2", datetime(2026, 9, 2, 8, tzinfo=timezone.utc), ["s1"]).read_text(
+        encoding="utf-8")
+    assert '<p class="note bad" data-past-note hidden></p>' in html
+
+
+def test_inline_script_is_present_safe_and_self_contained(tmp_path):
+    root, page = build(tmp_path, names=("a&b",))
+    make_data(root, "a&b", issues=3)
+    write_status(root, NOW)
+    html = page()
+    scripts = re.findall(r"<script[^>]*>(.*?)</script>", html, flags=re.S)
+    assert scripts == [site.SCRIPT]  # one inline script, the constant: no page data inside it
+    assert "<script src" not in html and "innerHTML" not in site.SCRIPT and "eval(" not in site.SCRIPT
+    assert "Date.now()" in site.SCRIPT and "36 * HOUR" in site.SCRIPT
+    assert 'getElementById("stale-banner")' in site.SCRIPT and "data-last-run" in site.SCRIPT
+    assert "data-target" in site.SCRIPT and "data-last-issue" in site.SCRIPT and "data-past-note" in site.SCRIPT
+    assert not re.search(r"<link[^>]+href=[\"']?https?:", html)
+    assert "@font-face" not in html and "fonts.googleapis" not in html and "url(" not in html
+    assert "http://" not in html.replace("http://www.w3.org/2000/svg", "") and "https://" not in html
+    assert "a&amp;b" in html and "a&b" not in _markup(html)
