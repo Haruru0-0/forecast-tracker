@@ -6,7 +6,6 @@ import numpy as np
 import pytest
 import responses
 
-from ftracker import sources
 from ftracker.series import SourceError
 from ftracker.sources import openmeteo
 
@@ -17,11 +16,6 @@ LAT, LON = 29.76, -95.37
 
 def _load(name):
     return json.loads((FIX / name).read_text(encoding="utf-8"))
-
-
-@pytest.fixture(autouse=True)
-def no_sleep(monkeypatch):
-    monkeypatch.setattr(sources, "_sleep", lambda s: None)
 
 
 @responses.activate
@@ -64,3 +58,25 @@ def test_http_failure_retries_then_raises_source_error():
     with pytest.raises(SourceError):
         openmeteo.fetch_air_quality(LAT, LON, TZ, date(2026, 10, 30), date(2026, 11, 1))
     assert len(responses.calls) == 3
+
+
+@responses.activate
+@pytest.mark.parametrize("end", [date(2026, 11, 2), date(2026, 11, 3)])
+def test_weather_today_and_later_are_nan(end):
+    responses.add(responses.GET, openmeteo.ARCHIVE_URL, json=_load("openmeteo_weather.json"))
+    responses.add(responses.GET, openmeteo.FORECAST_URL, json=_load("openmeteo_weather_recent.json"))
+    s = openmeteo.fetch_weather(LAT, LON, TZ, date(2026, 10, 31), end, today=date(2026, 11, 2))
+    assert list(s.index)[-1] == end
+    assert s.loc[date(2026, 11, 1)] == 28.4
+    assert s.loc[date(2026, 11, 2):].isna().all()  # recorded forecast for 11-02 is 27.6; must not leak
+    assert 27.6 not in s.values
+
+
+@responses.activate
+@pytest.mark.parametrize("end", [date(2026, 10, 31), date(2026, 11, 1)])
+def test_air_quality_today_and_later_are_nan(end):
+    responses.add(responses.GET, openmeteo.AIR_URL, json=_load("openmeteo_air.json"))
+    # Chicago 10-31 is fully present in the fixture, but with today=10-31 it is not finished.
+    s = openmeteo.fetch_air_quality(LAT, LON, TZ, date(2026, 10, 30), end, today=date(2026, 10, 31))
+    assert not np.isnan(s.loc[date(2026, 10, 30)])
+    assert s.loc[date(2026, 10, 31):].isna().all()

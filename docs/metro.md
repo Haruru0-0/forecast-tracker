@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Metro | Houston, TX (29.76 N, -95.37 E), timezone `America/Chicago` |
+| Metro | Houston, TX (29.76 N, 95.37 W), timezone `America/Chicago` |
 | EIA balancing authority | `ERCO` (ERCOT), hourly demand, MWh per hour |
 | USGS gauge | `08074000` Buffalo Bayou at Houston, TX, parameter `00060` (discharge), ft3/s |
 | Weather | Open-Meteo, daily maximum 2 m temperature, degC |
@@ -10,7 +10,7 @@
 
 ## Why Houston
 
-- The area is served by one balancing authority. ERCOT covers almost all of Texas, so the `ERCO` demand series is dominated by the Houston load and there is no ambiguity about which BA serves the metro (unlike metros split across PJM/MISO subregions).
+- The area is served by one balancing authority. ERCOT covers almost all of Texas, so which BA serves the metro is unambiguous (unlike metros split across PJM/MISO subregions). The series is statewide demand, though, so Houston weather is only a partial driver of it.
 - USGS gauge 08074000 sits in central Houston, is a long-running continuous discharge station, and reports parameter 00060 in ft3/s.
 - A single timezone, and it has both DST transitions, which exercises the local-day logic.
 
