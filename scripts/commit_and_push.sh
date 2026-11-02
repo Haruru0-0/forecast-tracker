@@ -25,7 +25,13 @@ for attempt in 1 2 3; do
   # Deliberately incremental (base = remote tip), not the whole history scan that
   # CI runs: one bad commit anywhere in history must keep CI red, but must not
   # stop the bot from recording new data every day.
-  python -m ftracker.immutability --base "$base"
+  # IMMUTABILITY_CHECKER (a path to a standalone copy of the checker) exists for the
+  # tests only; production leaves it unset and runs the installed module.
+  if [ -n "${IMMUTABILITY_CHECKER:-}" ]; then
+    python "$IMMUTABILITY_CHECKER" --base "$base"
+  else
+    python -m ftracker.immutability --base "$base"
+  fi
   if git push origin HEAD:main; then
     exit 0
   fi
