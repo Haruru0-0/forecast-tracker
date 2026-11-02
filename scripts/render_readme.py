@@ -13,11 +13,16 @@ import pandas as pd
 START = "<!-- results:start -->"
 END = "<!-- results:end -->"
 ROOT = Path(__file__).resolve().parents[1]
-HEADER = "| series | method | horizon | n | n missing | MAE | coverage | skill |"
+HEADER = "| series | method | horizon | n | n missing | MAE (n) | coverage (n) | skill (n) |"
 
 
 def _fmt(value: object, digits: int) -> str:
     return "-" if pd.isna(value) else f"{float(value):.{digits}f}"
+
+
+def _with_n(value: object, digits: int, n: object) -> str:
+    """A number with the sample count it rests on; '-' alone when there is no number."""
+    return "-" if pd.isna(value) else f"{float(value):.{digits}f} (n={int(n)})"
 
 
 def render_block(csv_path: Path) -> str:
@@ -32,7 +37,7 @@ def render_block(csv_path: Path) -> str:
     for r in board.itertuples(index=False):
         lines.append(
             f"| {r.series} | {r.method} | {int(r.horizon)} | {int(r.n)} | {int(r.n_missing)} "
-            f"| {_fmt(r.mae, 3)} | {_fmt(r.coverage, 2)} | {_fmt(r.skill, 2)} |"
+            f"| {_with_n(r.mae, 3, r.n)} | {_with_n(r.coverage, 2, r.n)} | {_fmt(r.skill, 2)} (n={int(r.n_skill)}) |"
         )
     return "\n".join(lines)
 

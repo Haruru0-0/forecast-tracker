@@ -35,5 +35,15 @@ def test_block_renders_table_from_csv(tmp_path):
         "weather_tmax,model,1,12,0,1.25,0.8,0.25,12\n"
         "weather_tmax,persistence,1,12,1,1.6,,,0\n", encoding="utf-8")
     block = mod.render_block(csv)
-    assert "| weather_tmax | model | 1 | 12 | 0 | 1.250 | 0.80 | 0.25 |" in block
-    assert "| weather_tmax | persistence | 1 | 12 | 1 | 1.600 | - | - |" in block
+    assert block.splitlines()[0] == "| series | method | horizon | n | n missing | MAE (n) | coverage (n) | skill (n) |"
+    assert "| weather_tmax | model | 1 | 12 | 0 | 1.250 (n=12) | 0.80 (n=12) | 0.25 (n=12) |" in block
+    assert "| weather_tmax | persistence | 1 | 12 | 1 | 1.600 (n=12) | - | - (n=0) |" in block
+
+
+def test_skill_sample_count_is_n_skill_not_n(tmp_path):
+    mod = _renderer()
+    csv = tmp_path / "s.csv"
+    csv.write_text(
+        "series,method,horizon,n,n_missing,mae,coverage,skill,n_skill\n"
+        "river,model,7,30,2,5.5,0.75,0.1,21\n", encoding="utf-8")
+    assert "| river | model | 7 | 30 | 2 | 5.500 (n=30) | 0.75 (n=30) | 0.10 (n=21) |" in mod.render_block(csv)

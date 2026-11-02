@@ -312,3 +312,16 @@ def test_commit_script_stays_incremental_and_says_why():
     assert 'base="$(git rev-parse origin/main)"' in text
     assert "--whole-history" not in text
     assert "whole history" in text.lower()
+
+
+def test_daily_renders_readme_after_site_and_commits_it_with_results():
+    _, _, steps = _daily()
+    site = _idx(steps, "ftracker.cli site")
+    results = _script_idx(steps, "results")
+    body = steps[results]["run"]
+    assert site < results
+    assert "python scripts/render_readme.py" in body
+    assert body.index("python scripts/render_readme.py") < body.index("commit_and_push.sh")
+    paths = body.split("commit_and_push.sh", 1)[1].split("\n", 1)[0].split()
+    assert paths[-2:] == ["results", "README.md"]
+    assert not any("render_readme" in s.get("run", "") for i, s in enumerate(steps) if i != results)

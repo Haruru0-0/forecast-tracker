@@ -51,10 +51,11 @@ jobs:
           set +e
           python -m ftracker.cli site
           echo "exit_code=$?" >> "$GITHUB_OUTPUT"
-      - name: Commit and push results
+      - name: Refresh the README results block, commit and push results
         run: |
           if [ "${{ steps.site.outputs.exit_code }}" = "0" ]; then
-            bash scripts/commit_and_push.sh "results: daily run ${GITHUB_RUN_ID}" results
+            python scripts/render_readme.py
+            bash scripts/commit_and_push.sh "results: daily run ${GITHUB_RUN_ID}" results README.md
           fi
       - uses: actions/upload-pages-artifact@v3
         if: steps.site.outputs.exit_code == '0'
