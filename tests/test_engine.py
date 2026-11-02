@@ -182,3 +182,74 @@ def test_scoring_source_error_fails_series_but_not_others(tmp_path):
     report = engine.run_daily(tmp_path, {"bad": bad_down, "good": good}, later, "r2", [Stub()])
     assert "bad" in report.failed and "good" not in report.failed
     assert report.scored["good"] > 0
+
+
+class Boom(Stub):
+    def forecast(self, history, target_dates):
+        raise RuntimeError("lightgbm exploded")
+
+
+def test_unexpected_forecaster_error_writes_gap_and_fails(tmp_path):
+    report = engine.run_daily(tmp_path, {"s1": make_series()}, NOW, "r1", [Boom()])
+    assert not report.ok
+    gaps = store.read_gaps(tmp_path, "s1")
+    assert len(gaps) == 1 and gaps.reason.iloc[0].startswith("RuntimeError: lightgbm exploded")
+    assert store.read_forecasts(tmp_path, "s1").empty
+
+
+def test_retry_after_gap_reports_gap_in_status_but_stays_ok(tmp_path):
+    engine.run_daily(tmp_path, {"s1": make_series(down=True)}, NOW, "r1", [Stub()])
+    report = engine.run_daily(tmp_path, {"s1": make_series()}, NOW, "r2", [Stub()])
+    assert report.ok and report.issued["s1"] == 0
+    err = json.loads((tmp_path / "status.json").read_text())["series"]["s1"]["error"]
+    assert err.startswith("today's issue is a gap: ")
+    assert "SECRET" not in err
+
+
+def test_safe_strips_schemeless_query_string(tmp_path):
+    def fetch(start, end):
+        raise SourceError("url: /v2/x?frequency=daily&api_key=SECRET")
+
+    s = Series("s1", "u", "UTC", fetch)
+    report = engine.run_daily(tmp_path, {"s1": s}, NOW, "r1", [Stub()])
+    gap = store.read_gaps(tmp_path, "s1").reason.iloc[0]
+    status = (tmp_path / "status.json").read_text()
+    for text in (gap, report.failed["s1"], status):
+        assert "SECRET" not in text and "api_key" not in text
+
+
+def test_stale_boundary_lead_10_issues_lead_11_gaps(tmp_path):
+    ok_series = make_series("ok", missing={ISSUE - timedelta(days=i) for i in (1, 2)})
+    assert engine.issue_forecasts(tmp_path, ok_series, ISSUE, NOW, "r", [Stub()]) == 7
+    stale = make_series("stale", missing={ISSUE - timedelta(days=i) for i in (1, 2, 3)})
+    with pytest.raises(engine.StaleHistory):
+        engine.issue_forecasts(tmp_path, stale, ISSUE, NOW, "r", [Stub()])
+    assert store.read_gaps(tmp_path, "stale").reason.iloc[0].startswith("history stale")
+
+
+def test_registry_key_differs_from_series_name(tmp_path):
+    report = engine.run_daily(tmp_path, {"weather": make_series("weather_tmax")}, NOW, "r1", [Stub()])
+    assert (tmp_path / "forecasts" / "weather_tmax" / "2026-11-03.json").exists()
+    assert not (tmp_path / "forecasts" / "weather").exists()
+    assert set(report.issued) == {"weather_tmax"}
+    assert set(json.loads((tmp_path / "status.json").read_text())["series"]) == {"weather_tmax"}
+
+
+def test_score_outcomes_rejects_naive_now(tmp_path):
+    with pytest.raises(ValueError):
+        engine.score_outcomes(tmp_path, make_series(), date(2026, 11, 6), datetime(2026, 11, 6))
+
+
+def test_default_forecasters_end_to_end(tmp_path):
+    import time
+
+    start = ISSUE - timedelta(days=800)
+    vals = {start + timedelta(days=i): 10.0 + (i % 7) + 0.01 * i for i in range(801)}
+    s = make_series("syn", values=vals)
+    t0 = time.time()
+    report = engine.run_daily(tmp_path, {"syn": s}, NOW, "r1")
+    assert report.ok and report.issued["syn"] == 21
+    df = store.read_forecasts(tmp_path, "syn")
+    assert set(df.method) == {"seasonal_naive", "persistence", "model"} and len(df) == 21
+    assert ((df.lo <= df.point) & (df.point <= df.hi)).all()
+    assert time.time() - t0 < 30

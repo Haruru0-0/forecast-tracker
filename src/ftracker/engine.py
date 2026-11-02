@@ -51,6 +51,7 @@ class StaleHistory(Exception):
 def _safe(text: object, limit: int = 200) -> str:
     """Short message without URLs, query strings or key-like values."""
     s = re.sub(r"https?://\S+", "<url>", str(text))
+    s = re.sub(r"\S*\?\S+", "<url>", s)  # scheme-less paths with a query string
     s = re.sub(r"(?i)\b([\w-]*(?:key|token|secret|password)[\w-]*)\s*[=:]\s*\S+", r"\1=<redacted>", s)
     s = " ".join(s.split())
     return s[:limit]
@@ -73,6 +74,25 @@ def issue_forecasts(
     name = series.name
     if issue_date in store.issued_dates(root, name):
         return 0
+    try:
+        return _issue(root, series, issue_date, now, run_id, forecasters)
+    except Exception as exc:
+        try:  # make sure the missing day is recorded; specific gaps may already exist
+            store.write_gap(root, name, issue_date, f"{type(exc).__name__}: {_safe(exc)}")
+        except store.AlreadyWritten:
+            pass
+        raise
+
+
+def _issue(
+    root: Path,
+    series: Series,
+    issue_date: date,
+    now: datetime,
+    run_id: str,
+    forecasters: list[Forecaster],
+) -> int:
+    name = series.name
     last_day = issue_date - timedelta(days=1)
     try:
         history = series.fetch_daily(last_day - timedelta(days=HISTORY_DAYS), last_day)
@@ -108,6 +128,7 @@ def issue_forecasts(
 
 
 def score_outcomes(root: Path, series: Series, today: date, now: datetime) -> int:
+    _require_aware(now)
     name = series.name
     forecasts = store.read_forecasts(root, name)
     if forecasts.empty:
@@ -167,6 +188,7 @@ def run_daily(
     for series in registry.values():
         name = series.name
         errors: list[str] = []
+        status_note: str | None = None
         try:
             report.issued[name] = issue_forecasts(root, series, issue_date, now, run_id, forecasters)
         except Exception as exc:  # isolate each series; type and message only
@@ -179,12 +201,17 @@ def run_daily(
             errors.append(_describe(exc))
         if errors:
             report.failed[name] = "; ".join(errors)
+        elif report.issued[name] == 0:
+            gaps = store.read_gaps(root, name)
+            today_gap = gaps[gaps["issue_date"] == issue_date]
+            if not today_gap.empty:
+                status_note = f"today's issue is a gap: {today_gap['reason'].iloc[0]}"
         try:
             last_issue = _last_issue(root, name)
         except Exception as exc:
             last_issue = None
             errors.append(_describe(exc))
             report.failed[name] = "; ".join(errors)
-        status["series"][name] = {"last_issue": last_issue, "error": report.failed.get(name)}
+        status["series"][name] = {"last_issue": last_issue, "error": report.failed.get(name, status_note)}
     _write_status(root, status)
     return report
