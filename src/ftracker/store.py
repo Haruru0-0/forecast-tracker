@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from datetime import date, datetime
 from pathlib import Path
 
@@ -18,12 +20,19 @@ class AlreadyWritten(Exception):
 
 
 def _write_new(path: Path, payload: dict) -> Path:
+    text = json.dumps(payload, indent=2)  # serialize first: failures leave nothing on disk
     path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=".tmp-", suffix=".part")
+    tmp = Path(tmp_name)
     try:
-        with open(path, "x", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2)
-    except FileExistsError as e:
-        raise AlreadyWritten(str(path)) from e
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+        try:
+            os.link(tmp, path)  # fails if the target exists, never overwrites
+        except FileExistsError as e:
+            raise AlreadyWritten(str(path)) from e
+    finally:
+        tmp.unlink(missing_ok=True)
     return path
 
 

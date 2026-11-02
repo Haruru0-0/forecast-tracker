@@ -88,3 +88,22 @@ def test_read_empty_series_returns_empty_frame_with_columns(tmp_path):
     g = read_gaps(tmp_path, "nope")
     assert g.empty and list(g.columns) == ["issue_date", "reason"]
     assert issued_dates(tmp_path, "nope") == set()
+
+
+def test_failed_write_leaves_no_file_and_retry_succeeds(tmp_path):
+    bad_meta = {**META, "issued_at": datetime(2026, 11, 3, 6, 0)}
+    with pytest.raises(TypeError):
+        write_forecast(tmp_path, "weather", date(2026, 11, 3), _rows(), bad_meta)
+    d = tmp_path / "forecasts" / "weather"
+    assert not d.exists() or list(d.iterdir()) == []
+    assert issued_dates(tmp_path, "weather") == set()
+    p = write_forecast(tmp_path, "weather", date(2026, 11, 3), _rows(), META)
+    assert p.exists()
+    assert [x.name for x in d.iterdir()] == ["2026-11-03.json"]
+
+
+def test_refused_overwrite_leaves_no_temp_file(tmp_path):
+    write_gap(tmp_path, "weather", date(2026, 11, 4), "a")
+    with pytest.raises(AlreadyWritten):
+        write_gap(tmp_path, "weather", date(2026, 11, 4), "b")
+    assert [x.name for x in (tmp_path / "gaps" / "weather").iterdir()] == ["2026-11-04.json"]
