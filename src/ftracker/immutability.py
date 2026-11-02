@@ -74,12 +74,19 @@ def _touched(repo: Path, base: str, head: str, paths: tuple[str, ...]) -> list[s
 
 
 def check_guard(repo: Path, base: str, head: str = "HEAD") -> list[str]:
-    """Return a message when base..head changes a guard file and touches protected data."""
+    """Return a message when base..head changes a guard file and touches protected data.
+
+    The data side is the net diff base..head only. Per-commit diffs would count the bot's
+    data that a merge (``git pull`` without ``--rebase``) brings in against its first
+    parent, although that data is already in base. Add-then-edit or add-then-delete inside
+    the range is still caught by the per-commit scan in ``check_immutable``.
+    """
     _require_base(base)
     if _is_zero(base):
         return []
     guard = _touched(repo, base, head, GUARD)
-    data = _touched(repo, base, head, PROTECTED)
+    net_data = _git(repo, "diff", "--name-only", "--no-renames", base, head, "--", *PROTECTED)
+    data = sorted({p for p in net_data.splitlines() if p.strip()})
     if guard and data:
         return [f"guard files changed in the same push as protected data: {', '.join(guard)} "
                 f"together with {len(data)} file(s) under {', '.join(PROTECTED)}"]

@@ -305,3 +305,57 @@ def test_whole_history_checks_every_root(repo):
 
 def test_main_requires_base_or_whole_history(repo):
     assert main(["--repo", str(repo)]) == 2
+
+
+# ---------- guard rule: data side is the net diff; shallow clones are refused ----------
+
+def _pull_with_merge(repo):
+    """Workflow edited locally, the bot's daily data commit pulled in with a merge (no --rebase)."""
+    main_branch = git(repo, "rev-parse", "--abbrev-ref", "HEAD")
+    git(repo, "checkout", "-q", "-b", "bot")
+    write(repo, "data/forecasts/s/2026-06-01.json", "1\n")
+    write(repo, "data/outcomes/s/2026-06-01.json", "1\n")
+    bot_tip = commit(repo, "data: daily")
+    git(repo, "checkout", "-q", main_branch)
+    write(repo, ".github/workflows/ci.yml", "edited\n")
+    commit(repo, "ci: edit workflow")
+    git(repo, "merge", "-q", "--no-ff", "-m", "Merge remote-tracking branch origin/main", "bot")
+    return bot_tip  # the remote tip before the push, i.e. github.event.before
+
+
+def test_guard_ignores_bot_data_brought_in_by_a_merge(repo):
+    before = _pull_with_merge(repo)
+    assert check_guard(repo, before) == []
+    assert check_immutable(repo, before) == []
+    assert main(["--base", before, "--guard", "--repo", str(repo)]) == 0
+
+
+def test_guard_still_fails_when_the_net_diff_has_guard_and_new_data(repo):
+    base = git(repo, "rev-parse", "HEAD")
+    write(repo, "scripts/commit_and_push.sh", "changed\n")
+    write(repo, "data/gaps/s/2026-06-01.json", "1\n")
+    commit(repo, "both in one commit")
+    result = check_guard(repo, base)
+    assert result and "scripts/commit_and_push.sh" in result[0]
+
+
+def test_guard_still_fails_when_the_net_diff_has_guard_and_edited_data(repo):
+    base = git(repo, "rev-parse", "HEAD")
+    write(repo, ".github/workflows/ci.yml", "changed\n")
+    commit(repo, "ci")
+    write(repo, "data/forecasts/s/2026-01-01.json", "tampered\n")
+    commit(repo, "edit")
+    assert check_guard(repo, base)
+    assert main(["--base", base, "--guard", "--repo", str(repo)]) == 1
+
+
+def test_guard_passes_data_only_and_guard_only_pushes(repo):
+    base = git(repo, "rev-parse", "HEAD")
+    write(repo, "data/forecasts/s/2026-06-02.json", "1\n")
+    commit(repo, "data only")
+    assert check_guard(repo, base) == []
+    base = git(repo, "rev-parse", "HEAD")
+    write(repo, "src/ftracker/immutability.py", "changed\n")
+    write(repo, ".github/workflows/daily.yml", "changed\n")
+    commit(repo, "guard only")
+    assert check_guard(repo, base) == []
