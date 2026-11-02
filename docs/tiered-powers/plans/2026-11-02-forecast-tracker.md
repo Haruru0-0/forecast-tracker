@@ -201,7 +201,7 @@ tests/  (one test file per module, fixtures in tests/fixtures/)
   - `class Forecaster(Protocol)`: `name: str`; `forecast(self, history: pd.Series, target_dates: list[date]) -> pd.DataFrame` indexed by `target_date` with columns `point, lo, hi` (80% interval). `history` is indexed by `date`, may contain NaN; the last non-NaN day is the origin and lead = `(target - origin).days`.
   - `SeasonalNaive(name="seasonal_naive")`: point = the last observed value on the same weekday at or before the origin.
   - `Persistence(name="persistence")`: point = last non-NaN value.
-  - `GBMForecaster(name="model")`: LightGBM on lag features (lags 1 to 14, day of week, day of year) with one model per lead 2 to 8.
+  - `GBMForecaster(name="model")`: LightGBM on lag features (lags 1 to 14, day of week, day of year) with one model per lead 1 to 8 (the engine uses leads 2 to 8, the backtest leads 1 to 7).
   - Intervals for all three: the 10th and 90th percentiles of that forecaster's own past residuals for the same lead, computed by rolling-origin over the last 120 days of history, added to the point forecast. Fewer than 60 non-NaN days raises `InsufficientHistory`.
 
 - [ ] **Step 1: Write the failing tests** on synthetic data (weekly sine pattern plus seeded noise, 400 days):
@@ -254,7 +254,7 @@ tests/  (one test file per module, fixtures in tests/fixtures/)
   - `@dataclass class RunReport: issued: dict[str,int]; scored: dict[str,int]; failed: dict[str,str]`, with property `ok -> bool` (`not failed`).
   - `issue_forecasts(root: Path, series: Series, issue_date: date, now: datetime, run_id: str, forecasters: list[Forecaster]) -> int` — returns rows written, 0 if `issue_date` is already in `store.issued_dates`. Fetches history ending at `issue_date - 1` (about 730 days back), writes a gap and re-raises on `SourceError` or `InsufficientHistory`. Writes target days `issue_date + 1` to `+ 7` as horizons 1 to 7, with `last_observed` in `meta`.
   - `score_outcomes(root: Path, series: Series, today: date, now: datetime) -> int` — for each forecast target date `T` with `T + 2 days <= today` and no outcome file yet, fetch `T` and write the outcome (null if missing); a `SourceError` stops scoring that series for this run and raises.
-  - `run_daily(root: Path, registry: dict[str, Series], now: datetime, run_id: str, forecasters: list[Forecaster] | None = None) -> RunReport` — issue date is `now`'s UTC date; every series is isolated in try/except; always rewrites `root/status.json` with `last_run` (ISO time) and, per series, `last_issue` and `error`.
+  - `run_daily(root: Path, registry: dict[str, Series], now: datetime, run_id: str, forecasters: list[Forecaster] | None = None) -> RunReport` — issue date is `now`'s UTC date; every series is isolated in try/except; always rewrites `root/status.json` as `{"last_run": <ISO time>, "series": {<name>: {"last_issue": "YYYY-MM-DD" | null, "error": <str> | null}}}`.
   - `ftracker.cli daily` calls `run_daily` and exits 1 when `report.ok` is false (wired in Task 9).
 
 - [ ] **Step 1: Write the failing tests** with a fake in-memory `Series` and stub forecasters (the stub records the `history` it receives):
@@ -314,7 +314,7 @@ tests/  (one test file per module, fixtures in tests/fixtures/)
 
 **Interfaces:**
 - Consumes: `engine.run_daily`, `site.build_site`, `registry.SERIES`, `scoring.scoreboard`.
-- Produces: CLI commands (all accept `--data-dir`, default `data`) `daily` (runs `run_daily` with `run_id` from `GITHUB_RUN_ID`, exit 1 if any series failed), `site`, `check-sources`; `scripts/render_readme.py` writes a results block between `<!-- results:start -->` and `<!-- results:end -->` from `results/scoreboard.csv`, which `ftracker.cli site` also writes.
+- Produces: CLI commands (all accept `--data-dir`, default `data`) `daily` (runs `run_daily` with `run_id` from `GITHUB_RUN_ID`, exit 1 if any series failed), `site`, `check-sources`; `scripts/render_readme.py` writes a results block between `<!-- results:start -->` and `<!-- results:end -->` from `results/scoreboard.csv`, which `ftracker.cli site` also writes (to `--results-dir`, default `results`).
 
 - [ ] **Step 1: Write the failing tests** in `tests/test_workflows.py`:
   - `test_daily_has_schedule_and_manual_trigger` (a `cron` entry at about 10:00 UTC and `workflow_dispatch`).
@@ -363,7 +363,7 @@ tests/  (one test file per module, fixtures in tests/fixtures/)
 pytest -v
 python -m ftracker.cli daily --data-dir /tmp/ft-dry
 python -m ftracker.cli daily --data-dir /tmp/ft-dry
-python -m ftracker.cli site --data-dir /tmp/ft-dry --out /tmp/ft-site
+python -m ftracker.cli site --data-dir /tmp/ft-dry --results-dir /tmp/ft-results --out /tmp/ft-site
 python -m ftracker.immutability --base HEAD~1
 ```
 
