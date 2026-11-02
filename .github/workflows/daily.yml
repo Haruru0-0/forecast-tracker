@@ -2,7 +2,7 @@ name: daily
 
 on:
   schedule:
-    - cron: "0 10 * * *"
+    - cron: "17 10 * * *"
   workflow_dispatch:
 
 # Two runs must never overlap, and a run in progress is never cancelled.
@@ -17,6 +17,7 @@ permissions:
 
 jobs:
   daily:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -38,37 +39,35 @@ jobs:
           set +e
           python -m ftracker.cli daily
           echo "exit_code=$?" >> "$GITHUB_OUTPUT"
-      - name: Build site and scoreboard
-        run: python -m ftracker.cli site
-      - name: Record base commit
-        id: base
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - name: Commit data and results
+      # The forecast record is the product: commit and push data before anything
+      # that can fail. Pushes made with the built-in token do not trigger other
+      # workflows, so the script runs the immutability check itself.
+      - name: Commit and push data
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data results
-          if git diff --cached --quiet; then
-            echo "Nothing to commit."
-          else
-            git commit -m "data: daily run ${GITHUB_RUN_ID}"
+          bash scripts/commit_and_push.sh "data: daily run ${GITHUB_RUN_ID}" data
+      - name: Build site and scoreboard (failure is deferred to the last step)
+        id: site
+        run: |
+          set +e
+          python -m ftracker.cli site
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+      - name: Commit and push results
+        run: |
+          if [ "${{ steps.site.outputs.exit_code }}" = "0" ]; then
+            bash scripts/commit_and_push.sh "results: daily run ${GITHUB_RUN_ID}" results
           fi
-      # Pushes made with the built-in token do not trigger other workflows, so
-      # ci.yml never sees this commit. Check it here, before it is published.
-      - name: Immutability check on the new commit
-        run: python -m ftracker.immutability --base ${{ steps.base.outputs.sha }}
-      - name: Push data commit
-        run: git push
       - uses: actions/upload-pages-artifact@v3
+        if: steps.site.outputs.exit_code == '0'
         with:
           path: site
       - name: Deploy to Pages
         id: deploy
+        if: steps.site.outputs.exit_code == '0'
         uses: actions/deploy-pages@v4
-      - name: Fail the job if the daily run failed
-        if: ${{ always() }}
+      - name: Fail the job if the daily run or the site build failed
+        if: ${{ !cancelled() }}
         run: |
-          if [ "${{ steps.daily.outputs.exit_code }}" != "0" ]; then
-            echo "The daily command failed (exit code ${{ steps.daily.outputs.exit_code }}); see its step log."
+          if [ "${{ steps.daily.outputs.exit_code }}" != "0" ] || [ "${{ steps.site.outputs.exit_code }}" != "0" ]; then
+            echo "Failed: daily exit code ${{ steps.daily.outputs.exit_code }}, site exit code ${{ steps.site.outputs.exit_code }}; see those step logs."
             exit 1
           fi

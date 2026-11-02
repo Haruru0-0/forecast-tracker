@@ -44,12 +44,26 @@ def _idx(steps, needle, key="run"):
     return next(i for i, s in enumerate(steps) if needle in str(s.get(key, "")))
 
 
+SCRIPT = ROOT / "scripts" / "commit_and_push.sh"
+
+
+def _script_idx(steps, path):
+    return next(i for i, s in enumerate(steps)
+                if "commit_and_push.sh" in s.get("run", "")
+                and re.search(rf"\b{path}\b", s["run"].split("commit_and_push.sh")[1]))
+
+
 def test_daily_has_schedule_and_manual_trigger():
     _, doc, _ = _daily()
     triggers = doc.get("on", doc.get(True))
     assert "workflow_dispatch" in triggers
     minute, hour, *rest = triggers["schedule"][0]["cron"].split()
-    assert hour == "10" and rest == ["*", "*", "*"]
+    assert minute == "17" and hour == "10" and rest == ["*", "*", "*"]
+
+
+def test_daily_job_only_runs_on_main():
+    _, doc, _ = _daily()
+    assert next(iter(doc["jobs"].values()))["if"] == "github.ref == 'refs/heads/main'"
 
 
 def test_daily_permissions_are_contents_write_pages_write_id_token_write():
@@ -67,10 +81,10 @@ def test_daily_reads_eia_key_from_secret_never_literal():
 
 def test_daily_never_force_pushes():
     _, _, steps = _daily()
-    pushes = [s["run"] for s in steps if "git push" in s.get("run", "")]
-    assert pushes
-    for run in pushes:
-        assert "--force" not in run and not re.search(r"\s-f", run) and "--force-with-lease" not in run
+    assert not any("git push" in s.get("run", "") for s in steps)  # only the script pushes
+    script = SCRIPT.read_text(encoding="utf-8")
+    assert "push origin HEAD:main" in script
+    assert "--force" not in script and not re.search(r"\s-f\b", script)
 
 
 def test_daily_serializes_runs_without_cancelling():
@@ -79,15 +93,65 @@ def test_daily_serializes_runs_without_cancelling():
     assert doc["concurrency"]["cancel-in-progress"] is False
 
 
-def test_daily_commits_data_before_failing_the_job():
+def test_daily_commits_data_first_then_site_then_results_then_pages():
+    _, doc, steps = _daily()
+    d = _idx(steps, "ftracker.cli daily")
+    data = _script_idx(steps, "data")
+    site = _idx(steps, "ftracker.cli site")
+    results = _script_idx(steps, "results")
+    up = _idx(steps, "upload-pages-artifact", "uses")
+    dep = _idx(steps, "deploy-pages", "uses")
+    assert d < data < site < results < up < dep < len(steps) - 1
+    assert steps[d]["id"] == "daily" and "continue-on-error" not in steps[d]
+    assert steps[site]["id"] == "site" and "continue-on-error" not in steps[site]
+    assert "set +e" in steps[d]["run"] and "set +e" in steps[site]["run"]
+    assert "exit_code=$?" in steps[d]["run"] and "exit_code=$?" in steps[site]["run"]
+    assert "steps.site.outputs.exit_code" in steps[results]["run"]
+    assert "github-pages" in str(next(iter(doc["jobs"].values()))["environment"])
+
+
+def test_daily_checkout_has_full_history():
     _, _, steps = _daily()
-    push = _idx(steps, "git push")
-    assert _idx(steps, "ftracker.immutability") < push
-    assert _idx(steps, "git rev-parse HEAD") < _idx(steps, "git commit") < _idx(steps, "ftracker.immutability") < push
-    assert _idx(steps, "ftracker.cli daily") < _idx(steps, "ftracker.cli site") < _idx(steps, "git commit")
-    assert push < _idx(steps, "upload-pages-artifact", "uses") < _idx(steps, "deploy-pages", "uses")
-    assert push < len(steps) - 1
-    daily = steps[_idx(steps, "ftracker.cli daily")]
-    assert daily.get("id") and "continue-on-error" not in daily
-    assert "exit 1" in steps[-1]["run"] and daily["id"] in steps[-1]["run"]
-    assert "github-pages" in str(_daily()[1]["jobs"])
+    checkout = next(s for s in steps if str(s.get("uses", "")).startswith("actions/checkout"))
+    assert checkout["with"]["fetch-depth"] == 0
+
+
+def test_daily_final_step_always_runs_and_fails_on_either_exit_code():
+    _, _, steps = _daily()
+    last = steps[-1]
+    assert "!cancelled()" in last["if"] or "always()" in last["if"]
+    assert "exit 1" in last["run"]
+    assert "steps.daily.outputs.exit_code" in last["run"] and "steps.site.outputs.exit_code" in last["run"]
+
+
+def test_daily_no_step_between_daily_and_last_is_skippable_except_pages():
+    _, _, steps = _daily()
+    d = _idx(steps, "ftracker.cli daily")
+    for s in steps[d:-1]:
+        if "if" in s:
+            assert str(s.get("uses", "")).startswith(("actions/upload-pages-artifact", "actions/deploy-pages"))
+            assert s["if"] == "steps.site.outputs.exit_code == '0'"
+
+
+def test_commit_script_checks_rebases_and_never_forces():
+    text = SCRIPT.read_text(encoding="utf-8")
+    assert "set -euo pipefail" in text
+    assert "ftracker.immutability --base" in text
+    assert "git rebase origin/main" in text
+    assert "git push origin HEAD:main" in text
+    assert "--force" not in text and not re.search(r"\s-f\b", text)
+    assert text.index("ftracker.immutability --base") < text.index("git push origin HEAD:main")
+    assert "EIA_API_KEY" not in text
+
+
+def test_commit_script_passes_bash_syntax_check():
+    import shutil
+    import subprocess
+
+    import pytest
+
+    bash = shutil.which("bash")
+    if bash is None:
+        pytest.skip("bash is not available, so the script syntax cannot be checked")
+    done = subprocess.run([bash, "-n", str(SCRIPT)], capture_output=True, text=True)
+    assert done.returncode == 0, done.stderr

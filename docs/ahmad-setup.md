@@ -7,3 +7,5 @@ The code is finished locally; nothing below has been done for you.
 3. **Set the Pages source** to "GitHub Actions" (Settings > Pages > Build and deployment).
 4. **Turn on branch protection for `main`** that blocks force-push and deletion (Settings > Branches). The append-only rule depends on history never being rewritten. Do not require pull requests, because the daily workflow pushes straight to `main`.
 5. **Run the daily workflow once by hand** (Actions > daily > Run workflow). Confirm it ends green, that a `data:` commit appeared, and that the Pages URL loads the scoreboard. Then put that URL in the "Live page" line of `README.md`.
+
+Notes: allow Actions under Settings > Actions > General. GitHub may disable scheduled workflows after 60 days without repository activity, so if the page stops updating, check the Actions tab and re-enable the workflow.
