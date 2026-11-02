@@ -61,9 +61,10 @@ def backtest(series: str, days: int, step: int, data_dir: Path) -> int:
     for s in selected:
         try:
             yesterday = _today(s.tz) - timedelta(days=1)
-            last_origin = yesterday - timedelta(days=7)
-            first_origin = last_origin - timedelta(days=days)
+            # origin = last observed day; issue = origin + 1; targets up to origin + 8 <= yesterday
+            last_origin = yesterday - timedelta(days=8)
             origins = [last_origin - timedelta(days=k) for k in range(0, days + 1, step)][::-1]
+            first_origin = origins[0]
             history = s.fetch_daily(first_origin - timedelta(days=730), yesterday)
             result = run_backtest(history, default_forecasters(), origins, s.lower_bound)
             out_dir.mkdir(parents=True, exist_ok=True)

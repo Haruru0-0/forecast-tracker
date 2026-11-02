@@ -22,16 +22,21 @@ def default_forecasters() -> list[Forecaster]:
 
 def run_backtest(history: pd.Series, forecasters: list[Forecaster], origins: list[date],
                  lower_bound: float | None = None) -> pd.DataFrame:
-    """Forecast O+1..O+7 from history truncated to days <= O; attach actuals from the full history.
+    """Replay the live schedule on each origin O (the last observed day).
 
-    Origins with too little history are skipped. `actual` is NaN where the day was not observed."""
+    The live engine issues on day D from history ending D-1 and targets D+1..D+7. Here the
+    issue date is O+1, so the forecasters see history <= O and forecast O+2..O+8 (leads 2..8),
+    and ``horizon = (target_date - (O + 1 day)).days`` runs 1..7 exactly as in the live record.
+    The ``origin`` column holds O. Origins with too little history are skipped. ``actual`` is
+    NaN where the day was not observed."""
     hist = history.copy()
     hist.index = [pd.Timestamp(i).date() for i in hist.index]
     actuals = hist.dropna()
     rows = []
     for origin in origins:
         past = hist[[d <= origin for d in hist.index]]
-        targets = [origin + timedelta(days=h) for h in HORIZONS]
+        issue = origin + timedelta(days=1)
+        targets = [issue + timedelta(days=h) for h in HORIZONS]
         for f in forecasters:
             try:
                 fc = f.forecast(past, targets)
@@ -40,7 +45,7 @@ def run_backtest(history: pd.Series, forecasters: list[Forecaster], origins: lis
             fc = apply_floor(fc, lower_bound)
             for target, r in fc.iterrows():
                 t = pd.Timestamp(target).date()
-                rows.append((origin.isoformat(), f.name, t.isoformat(), (t - origin).days,
+                rows.append((origin.isoformat(), f.name, t.isoformat(), (t - issue).days,
                              float(r["point"]), float(r["lo"]), float(r["hi"]),
                              float(actuals[t]) if t in actuals.index else float("nan")))
     return pd.DataFrame(rows, columns=COLUMNS)

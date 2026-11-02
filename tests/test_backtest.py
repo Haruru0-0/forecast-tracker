@@ -35,7 +35,8 @@ def test_no_leakage():
     assert [s[0] for s in stub.seen] == origins
     for origin, last, targets in stub.seen:
         assert last <= origin
-        assert targets == [origin + timedelta(days=h) for h in range(1, 8)]
+        # issued the day after the origin, like the live engine: leads 2..8 from the last observed day
+        assert targets == [origin + timedelta(days=h) for h in range(2, 9)]
 
 
 def test_backtest_rows_per_origin():
@@ -47,14 +48,14 @@ def test_backtest_rows_per_origin():
     for (origin, method), g in out.groupby(["origin", "method"]):
         assert sorted(g["horizon"]) == list(range(1, 8))
     row = out[(out["origin"] == origins[0].isoformat()) & (out["horizon"] == 3) & (out["method"] == "persistence")].iloc[0]
-    target = origins[0] + timedelta(days=3)
+    target = origins[0] + timedelta(days=4)  # issue date = origin + 1, horizon counted from the issue date
     assert row["target_date"] == target.isoformat()
     assert row["actual"] == hist[target]
 
 
 def test_missing_actual_is_nan():
     hist = _history(120)
-    origin = hist.index.max() - timedelta(days=2)
+    origin = hist.index.max() - timedelta(days=3)  # targets origin+2..origin+8: only +2 and +3 observed
     out = run_backtest(hist, [Persistence()], [origin])
     assert out["actual"].isna().sum() == 5
     assert out["actual"].notna().sum() == 2
@@ -93,7 +94,10 @@ def test_backtest_writes_only_under_data_backtest(tmp_path, monkeypatch):
     out = pd.read_csv(tmp_path / "backtest" / "toy.csv")
     assert list(out.columns) == COLUMNS
     assert out["origin"].nunique() >= 4
-    assert pd.to_datetime(out["origin"]).max().date() <= START + timedelta(days=379 - 7)
+    yesterday = START + timedelta(days=379)
+    assert pd.to_datetime(out["origin"]).max().date() == yesterday - timedelta(days=8)
+    assert pd.to_datetime(out["target_date"]).max().date() == yesterday  # every target is observable
+    assert out["actual"].notna().all()
 
 
 def test_cli_single_series_by_name(tmp_path, monkeypatch):
@@ -130,3 +134,27 @@ def test_cli_backtest_passes_series_lower_bound(tmp_path, monkeypatch):
     assert cli.main(["backtest", "--series", "toy", "--days", "14", "--data-dir", str(tmp_path)]) == 0
     out = pd.read_csv(tmp_path / "backtest" / "toy.csv")
     assert (out["point"] >= 0).all() and (out["lo"] >= 0).all()
+
+
+def test_horizon_is_counted_from_the_issue_date_like_live():
+    origin = START + timedelta(days=100)
+    out = run_backtest(_history(), [Persistence()], [origin])
+    assert sorted(out["horizon"]) == list(range(1, 8))
+    for r in out.itertuples():
+        issue = origin + timedelta(days=1)
+        assert (date.fromisoformat(r.target_date) - issue).days == r.horizon
+        assert r.origin == origin.isoformat()
+
+
+def test_cli_prints_the_real_first_origin(tmp_path, monkeypatch, capsys):
+    hist = _history(400)
+    series = Series("toy", "u", "UTC", lambda s, e: hist[(hist.index >= s) & (hist.index <= e)])
+    monkeypatch.setattr(cli, "SERIES", {"a": series})
+    monkeypatch.setattr(cli, "default_forecasters", lambda: [Persistence()])
+    monkeypatch.setattr(cli, "_today", lambda tz: START + timedelta(days=380))
+    assert cli.main(["backtest", "--series", "toy", "--days", "30", "--step", "7", "--data-dir", str(tmp_path)]) == 0
+    out = pd.read_csv(tmp_path / "backtest" / "toy.csv")
+    first, last = out["origin"].min(), out["origin"].max()
+    printed = capsys.readouterr().out
+    assert f"({first}..{last})" in printed
+    assert last == (START + timedelta(days=379 - 8)).isoformat()

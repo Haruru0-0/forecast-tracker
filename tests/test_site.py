@@ -473,3 +473,16 @@ def test_days_tracked_and_gap_days_per_series(tmp_path):
     s2 = up.split("<h3>s2</h3>", 1)[1].split("</article>", 1)[0]
     assert "days tracked: 4; gap days: 2" in s1
     assert "days tracked: 0; gap days: 1" in s2 and "no data yet" in s2
+
+
+def test_backtest_text_explains_horizon_and_origin(tmp_path):
+    root, page = build(tmp_path)
+    make_data(root, issues=3)
+    write_status(root, NOW)
+    bt = [{"origin": "2025-01-01", "method": m, "target_date": (date(2025, 1, 2) + timedelta(days=h)).isoformat(),
+           "horizon": h, "point": 5.0, "lo": 4.0, "hi": 6.0, "actual": 5.5}
+          for m in ("model", "seasonal_naive", "persistence") for h in range(1, 8)]
+    (root / "backtest").mkdir()
+    pd.DataFrame(bt).to_csv(root / "backtest" / "s1.csv", index=False)
+    tail = page().split("Backtest (historical, not live)")[1]
+    assert "horizon counted from the issue date, as in the live record; origin is the last observed day" in tail

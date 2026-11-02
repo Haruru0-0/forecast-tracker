@@ -505,7 +505,9 @@ def build_site(root: Path, out_dir: Path, now: datetime, series_names: list[str]
     backtest_html = ""
     if backtest:
         backtest_html = (f"<h2>{BACKTEST_TITLE}</h2>"
-                         '<p class="rule">Walk-forward replay on past data. Kept apart from the live numbers above.</p>'
+                         '<p class="rule">Walk-forward replay on past data. Kept apart from the live numbers above. '
+                         'Each replayed forecast is issued the day after its origin; horizon counted from the issue '
+                         'date, as in the live record; origin is the last observed day.</p>'
                          + "".join(backtest))
 
     page = f"""<!doctype html>
