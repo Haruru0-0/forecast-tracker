@@ -136,4 +136,31 @@ def test_bad_leads_rejected():
     with pytest.raises(ValueError):
         Persistence().forecast(s, [s.index[-1]])
     with pytest.raises(ValueError):
-        GBMForecaster().forecast(s, [s.index[-1] + timedelta(days=9)])
+        GBMForecaster().forecast(s, [s.index[-1] + timedelta(days=11)])
+
+
+def test_gbm_tolerates_two_missing_days_before_the_engine_window():
+    s = make_series(300)
+    s.iloc[-2:] = np.nan
+    origin = s.index[-3]
+    targets = [origin + timedelta(days=d) for d in range(4, 11)]  # D+1..D+7, leads 4..10
+    assert (targets[-1] - origin).days == 10
+    out = GBMForecaster().forecast(s, targets)
+    assert len(out) == 7 and np.isfinite(out.to_numpy()).all()
+    assert (out["lo"] <= out["point"]).all() and (out["point"] <= out["hi"]).all()
+
+
+def test_gbm_lead_11_and_lead_0_raise():
+    s = make_series(100)
+    with pytest.raises(ValueError, match="1..10"):
+        GBMForecaster().forecast(s, [s.index[-1] + timedelta(days=11)])
+    with pytest.raises(ValueError):
+        GBMForecaster().forecast(s, [s.index[-1]])
+
+
+def test_seasonal_naive_leads_7_and_14_boundaries():
+    s = make_series(100)
+    origin = s.index[-1]
+    out = SeasonalNaive().forecast(s, [origin + timedelta(days=7), origin + timedelta(days=14)])
+    assert out["point"].iloc[0] == s[origin]
+    assert out["point"].iloc[1] == s[origin]

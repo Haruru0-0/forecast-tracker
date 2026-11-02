@@ -29,6 +29,7 @@ RESIDUAL_WINDOW = 120
 MIN_RESIDUALS = 20
 LAGS = 14
 QUANTILES = (0.10, 0.90)
+MAX_LEAD = 10  # GBM leads 1..10: tolerates up to two missing days before the engine's D+7
 
 
 class InsufficientHistory(Exception):
@@ -86,7 +87,10 @@ class _Base:
         leads = [(d - origin_date).days for d in days]
         for lead in leads:
             if lead < 1 or (self.max_lead is not None and lead > self.max_lead):
-                raise ValueError(f"lead {lead} outside supported range for {self.name}")
+                raise ValueError(
+                    f"lead {lead} outside supported range for {self.name}"
+                    + (f" (1..{self.max_lead})" if self.max_lead else " (>= 1)")
+                )
         window = min(RESIDUAL_WINDOW, len(y) // 3)
         state = self._prepare(y, start, window)
         top = self.max_lead or max(8, max(leads, default=1))
@@ -146,7 +150,7 @@ class GBMForecaster(_Base):
     fitted lazily for the leads actually requested.
     """
 
-    max_lead = 8
+    max_lead = MAX_LEAD
 
     def __init__(self, name: str = "model", n_estimators: int = 150):
         self.name = name
