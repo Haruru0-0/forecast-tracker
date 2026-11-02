@@ -228,7 +228,7 @@ tests/  (one test file per module, fixtures in tests/fixtures/)
   - `mae(y: Sequence[float], yhat: Sequence[float]) -> float`
   - `coverage(y, lo, hi) -> float`
   - `skill(model_mae: float, baseline_mae: float) -> float | None` — `1 - model_mae/baseline_mae`; `None` when `baseline_mae <= 1e-9`.
-  - `scoreboard(series: str, forecasts: pd.DataFrame, outcomes: pd.DataFrame) -> pd.DataFrame` — inputs as returned by `store.read_forecasts` and `store.read_outcomes`; one row per `(method, horizon)` with columns `series, method, horizon, n, n_missing, mae, coverage, skill`. `skill` is filled only on `method == "model"`, against the lower MAE of the two baselines at that horizon. Rows with a null outcome count in `n_missing`, not `n`.
+  - `scoreboard(series: str, forecasts: pd.DataFrame, outcomes: pd.DataFrame) -> pd.DataFrame` — inputs as returned by `store.read_forecasts` and `store.read_outcomes`; one row per `(method, horizon)` with columns `series, method, horizon, n, n_missing, mae, coverage, skill, n_skill` (`n_skill` is the number of paired forecasts the skill rests on; filled on `model` rows only). `skill` is filled only on `method == "model"`, against the lower MAE of the two baselines at that horizon. Rows with a null outcome count in `n_missing`, not `n`.
 
 - [ ] **Step 1: Write the failing tests:**
   - `test_mae`: `mae([1,2,3],[2,2,5]) == 1.0`.
