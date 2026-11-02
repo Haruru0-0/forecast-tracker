@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from ftracker.registry import SERIES
@@ -29,10 +30,20 @@ def check_sources(lookback_days: int = 10) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="ftracker")
-    parser.add_argument("command", choices=["check-sources"])
+    sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("check-sources")
+    site_cmd = sub.add_parser("site", help="build the static scoreboard page")
+    site_cmd.add_argument("--root", default="data", help="data directory (default: data)")
+    site_cmd.add_argument("--out", default="site", help="output directory (default: site)")
     args = parser.parse_args(argv)
     if args.command == "check-sources":
         return check_sources()
+    if args.command == "site":
+        from ftracker.site import build_site
+
+        names = [s.name for s in SERIES.values()]
+        print(build_site(Path(args.root), Path(args.out), datetime.now(timezone.utc), names))
+        return 0
     return 2
 
 

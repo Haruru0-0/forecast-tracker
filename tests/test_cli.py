@@ -21,3 +21,9 @@ def test_check_sources_survives_non_source_error(monkeypatch, capsys):
     assert "first (u): latest" in out
     assert "broken: ERROR RuntimeError: weird failure" in out
     assert "third (u): latest" in out
+
+
+def test_site_command_writes_page(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "SERIES", {"a": Series("first", "u", "America/Chicago", lambda s, e: None)})
+    assert cli.main(["site", "--root", str(tmp_path / "data"), "--out", str(tmp_path / "site")]) == 0
+    assert "STALE" in (tmp_path / "site" / "index.html").read_text(encoding="utf-8")
