@@ -43,6 +43,7 @@ def test_usgs_real_fixture_parses():
     s = _fetch()
     assert list(s.index) == [date(2026, 10, 30)]
     assert s.dtype == float
+    assert np.isnan(s.loc[date(2026, 10, 30)])  # incomplete local day -> missing, not a partial mean
 
 
 @responses.activate
@@ -138,3 +139,17 @@ def test_usgs_malformed_payload_raises_source_error():
     responses.add(responses.GET, usgs.URL, json={"nope": 1})
     with pytest.raises(SourceError):
         _fetch()
+
+
+@responses.activate
+def test_usgs_negative_discharge_is_nan():
+    readings = [(t, "-5", q) if _in_hour(t, 3) else (t, v, q) for t, v, q in _day_readings()]
+    responses.add(responses.GET, usgs.URL, json=_payload(readings))
+    assert np.isnan(_fetch().loc[date(2026, 10, 30)])
+
+
+@responses.activate
+def test_usgs_zero_discharge_and_zfl_flag_are_kept():
+    readings = [(t, "0", ["P", "Zfl"]) for t, v, q in _day_readings()]
+    responses.add(responses.GET, usgs.URL, json=_payload(readings))
+    assert _fetch().loc[date(2026, 10, 30)] == 0.0

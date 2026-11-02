@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from ftracker.daily import aggregate_local_days
+from ftracker.daily import aggregate_local_days, mask_unfinished
 from ftracker.series import SourceError
 from ftracker.sources import get_json
 
@@ -26,13 +26,6 @@ def _daily_series(payload: dict, start: date, end: date) -> pd.Series:
     idx = [date.fromisoformat(d) for d in days]
     s = pd.Series([float("nan") if v is None else float(v) for v in vals], index=idx, dtype=float)
     return s[(s.index >= start) & (s.index <= end)]
-
-
-def _mask_unfinished(s: pd.Series, today: date) -> pd.Series:
-    """Today and later are not finished observations (the APIs serve forecasts there): NaN."""
-    s = s.copy()
-    s[[d >= today for d in s.index]] = float("nan")
-    return s
 
 
 def fetch_weather(lat: float, lon: float, tz: str, start: date, end: date,
@@ -58,7 +51,7 @@ def fetch_weather(lat: float, lon: float, tz: str, start: date, end: date,
     full = pd.Index([start + timedelta(days=i) for i in range((end - start).days + 1)])
     out = pd.concat(parts) if parts else pd.Series(dtype=float)
     out = out[~out.index.duplicated(keep="first")]
-    return _mask_unfinished(out.reindex(full).astype(float), today)
+    return mask_unfinished(out.reindex(full).astype(float), today)
 
 
 def fetch_air_quality(lat: float, lon: float, tz: str, start: date, end: date,
@@ -78,4 +71,4 @@ def fetch_air_quality(lat: float, lon: float, tz: str, start: date, end: date,
     hourly = pd.Series([float("nan") if v is None else float(v) for v in vals], index=times, dtype=float)
     daily = aggregate_local_days(hourly, tz, "mean")
     full = pd.Index([start + timedelta(days=i) for i in range((end - start).days + 1)])
-    return _mask_unfinished(daily.reindex(full).astype(float), today)
+    return mask_unfinished(daily.reindex(full).astype(float), today)

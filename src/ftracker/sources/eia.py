@@ -7,10 +7,9 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from ftracker.daily import aggregate_local_days
+from ftracker.daily import aggregate_local_days, mask_unfinished
 from ftracker.series import SourceError
 from ftracker.sources import get_json
-from ftracker.sources.openmeteo import _mask_unfinished
 
 URL = "https://api.eia.gov/v2/electricity/rto/region-data/data/"
 PAGE_LENGTH = 5000  # the API returns at most 5000 rows per request
@@ -44,11 +43,11 @@ def _rows(api_key: str, respondent: str, start: date, end: date) -> list[dict]:
         try:
             resp = payload["response"]
             page = resp["data"]
-            total = int(resp.get("total", len(page)))
+            total = int(resp["total"]) if resp.get("total") is not None else None  # absent: page until empty
         except (KeyError, TypeError, ValueError) as exc:
             raise SourceError(f"EIA response has unexpected shape: {type(exc).__name__}") from None
         rows.extend(page)
-        if not page or len(rows) >= total:
+        if not page or (total is not None and len(rows) >= total):
             return rows
 
 
@@ -65,11 +64,13 @@ def fetch_eia_demand(api_key: str, respondent: str, tz: str, start: date, end: d
     try:
         times = pd.to_datetime([r["period"] for r in rows], format="%Y-%m-%dT%H", utc=True)
         vals = [float("nan") if r.get("value") in (None, "") else float(r["value"]) for r in rows]
+        vals = [v if v > 0 else float("nan") for v in vals]  # demand <= 0 is a glitch, not data (NaN stays NaN)
     except (KeyError, TypeError, ValueError) as exc:
         raise SourceError(f"EIA row has unexpected shape: {type(exc).__name__}") from None
     hourly = pd.Series(vals, index=times, dtype=float)
+    hourly = hourly[~hourly.index.duplicated(keep="first")]
     if hourly.empty:
         daily = pd.Series(dtype=float)
     else:
         daily = aggregate_local_days(hourly, tz, "max")
-    return _mask_unfinished(daily.reindex(full).astype(float), today)
+    return mask_unfinished(daily.reindex(full).astype(float), today)

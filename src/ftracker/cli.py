@@ -8,7 +8,6 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from ftracker.registry import SERIES
-from ftracker.series import SourceError
 
 
 def check_sources(lookback_days: int = 10) -> int:
@@ -18,7 +17,7 @@ def check_sources(lookback_days: int = 10) -> int:
         today = datetime.now(ZoneInfo(series.tz)).date()
         try:
             data = series.fetch_daily(today - timedelta(days=lookback_days), today - timedelta(days=1)).dropna()
-        except (SourceError, ValueError, TypeError, KeyError) as exc:  # a bad payload must not end the loop
+        except Exception as exc:  # one broken series must never end the loop; type and message only
             print(f"{series.name}: ERROR {type(exc).__name__}: {exc}")
             failed = True
             continue

@@ -39,3 +39,10 @@ def aggregate_local_days(hourly: pd.Series, tz: str, how: Literal["mean", "max"]
         ok = counts.loc[day] == _expected_hours(day, tz)
         out[day] = float(values.loc[day]) if ok else np.nan
     return pd.Series(out, dtype=float)
+
+
+def mask_unfinished(s: pd.Series, today) -> pd.Series:
+    """Today and later are not finished observations (the APIs serve forecasts there): NaN."""
+    s = s.copy()
+    s[[d >= today for d in s.index]] = float("nan")
+    return s

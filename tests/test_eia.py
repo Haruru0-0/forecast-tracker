@@ -113,3 +113,67 @@ def test_eia_malformed_payload_raises_source_error():
     responses.add(responses.GET, eia.URL, json={"error": "bad"})
     with pytest.raises(SourceError):
         _fetch()
+
+
+def _peak_day_rows(skip_hour=None, null_hour=None, value_at=None):
+    """24 rows for Chicago 2026-10-30 (05Z .. 04Z next day); hour 10 is the 60000 spike."""
+    rows = []
+    for h in range(24):
+        if h == skip_hour:
+            continue
+        utc = 5 + h
+        period = f"2026-10-30T{utc:02d}" if utc < 24 else f"2026-10-31T{utc - 24:02d}"
+        value = "60000" if h == 10 else "40000"
+        if h == null_hour:
+            value = None
+        if value_at and h in value_at:
+            value = value_at[h]
+        rows.append({"period": period, "respondent": "ERCO", "type": "D", "value": value})
+    return rows
+
+
+def _serve(rows, total=None):
+    resp = {"data": rows}
+    if total is not None:
+        resp["total"] = str(total)
+    responses.add(responses.GET, eia.URL, json={"response": resp})
+
+
+@responses.activate
+def test_eia_day_with_missing_hour_is_nan_not_partial_peak():
+    _serve(_peak_day_rows(skip_hour=20), total=23)
+    assert np.isnan(_fetch(end=date(2026, 10, 30)).loc[date(2026, 10, 30)])
+
+
+@responses.activate
+def test_eia_day_with_null_value_is_nan_not_partial_peak():
+    _serve(_peak_day_rows(null_hour=20), total=24)
+    assert np.isnan(_fetch(end=date(2026, 10, 30)).loc[date(2026, 10, 30)])
+
+
+@responses.activate
+@pytest.mark.parametrize("bad", ["0", "-300"])
+def test_eia_non_positive_demand_is_nan(bad):
+    _serve(_peak_day_rows(value_at={20: bad}), total=24)
+    assert np.isnan(_fetch(end=date(2026, 10, 30)).loc[date(2026, 10, 30)])
+
+
+@responses.activate
+def test_eia_duplicate_periods_keep_first():
+    rows = _peak_day_rows()
+    rows.append(dict(rows[10], value="99999"))  # duplicate of the spike hour, later row loses
+    rows.append(dict(rows[0], value="70000"))
+    _serve(rows, total=len(rows))
+    assert _fetch(end=date(2026, 10, 30)).loc[date(2026, 10, 30)] == 60000.0
+
+
+@responses.activate
+def test_eia_pages_until_empty_when_total_missing(monkeypatch):
+    monkeypatch.setattr(eia, "PAGE_LENGTH", 12)
+    rows = _peak_day_rows()
+    _serve(rows[:12])
+    _serve(rows[12:])
+    _serve([])
+    s = _fetch(end=date(2026, 10, 30))
+    assert len(responses.calls) == 3
+    assert s.loc[date(2026, 10, 30)] == 60000.0

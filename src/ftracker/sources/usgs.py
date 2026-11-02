@@ -3,6 +3,8 @@
 The daily-values service lags by several days, so the instantaneous-values service is used.
 Rule: readings are averaged into hourly means (an hour needs at least one valid reading), then
 a local day is the mean of its hourly means and needs every hour (see aggregate_local_days).
+Negative discharge cannot occur at this gauge (Buffalo Bayou), so a reading < 0 is treated as a
+glitch and becomes NaN; zero is a valid reading and is kept.
 """
 
 from __future__ import annotations
@@ -12,15 +14,17 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from ftracker.daily import aggregate_local_days
+from ftracker.daily import aggregate_local_days, mask_unfinished
 from ftracker.series import SourceError
 from ftracker.sources import get_json
-from ftracker.sources.openmeteo import _mask_unfinished
 
 URL = "https://waterservices.usgs.gov/nwis/iv/"
 CHUNK_DAYS = 30  # the instantaneous service limits the range per request; stay well inside it
 NO_DATA = -999999.0
-BAD_QUALIFIERS = {"Ice", "Eqp", "Ssn", "Mnt", "Dis", "Bkw", "Zfl", "Rat", "Fld"}  # ice, equipment, etc.
+# A judgment call from the USGS data qualification codes (ice, equipment malfunction, seasonal,
+# maintenance, discontinued, backwater, rating, flood). "Zfl" (zero flow) is deliberately NOT here:
+# it is a legitimate reading.
+BAD_QUALIFIERS = {"Ice", "Eqp", "Ssn", "Mnt", "Dis", "Bkw", "Rat", "Fld"}
 
 
 def _readings(payload: dict) -> list[tuple[str, float]]:
@@ -44,7 +48,7 @@ def _number(raw, qualifiers) -> float:
         v = float(raw)
     except (TypeError, ValueError):
         return float("nan")
-    return float("nan") if v == NO_DATA else v
+    return float("nan") if v == NO_DATA or v < 0 else v
 
 
 def fetch_usgs(site: str, parameter: str, tz: str, start: date, end: date,
@@ -75,4 +79,4 @@ def fetch_usgs(site: str, parameter: str, tz: str, start: date, end: date,
     raw = raw[~raw.index.duplicated(keep="first")]
     hourly = raw.resample("1h").mean()  # NaN where an hour has no valid reading
     daily = aggregate_local_days(hourly, tz, "mean")
-    return _mask_unfinished(daily.reindex(full).astype(float), today)
+    return mask_unfinished(daily.reindex(full).astype(float), today)
