@@ -176,3 +176,132 @@ def test_empty_base_is_an_error(repo):
     with pytest.raises(ValueError):
         check_immutable(repo, "")
     assert main(["--base", "", "--repo", str(repo)]) != 0
+
+
+# ---------- standalone, guard files, whole history ----------
+
+import ast
+import shutil
+import sys
+
+from ftracker import immutability
+from ftracker.immutability import check_guard, check_whole_history
+
+CHECKER = Path(immutability.__file__)
+
+
+def test_checker_is_standard_library_only():
+    tree = ast.parse(CHECKER.read_text(encoding="utf-8"))
+    names = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names.update(a.name.split(".")[0] for a in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            names.add((node.module or "").split(".")[0])
+    assert "ftracker" not in names
+    assert names <= set(sys.stdlib_module_names) | {"__future__"}, names - set(sys.stdlib_module_names)
+
+
+def test_no_literal_tab_in_checker_source():
+    assert "\t" not in CHECKER.read_text(encoding="utf-8")
+
+
+def _standalone(tmp_path: Path, repo: Path, *args: str) -> subprocess.CompletedProcess:
+    copy = tmp_path / "standalone" / "immutability_base.py"
+    copy.parent.mkdir(exist_ok=True)
+    shutil.copy(CHECKER, copy)
+    return subprocess.run([sys.executable, "-I", str(copy), "--repo", str(repo), *args],
+                          capture_output=True, text=True, cwd=tmp_path / "standalone")
+
+
+def test_standalone_copy_runs_outside_the_package(tmp_path, repo):
+    base = git(repo, "rev-parse", "HEAD")
+    write(repo, "data/forecasts/s/2026-01-02.json", "1\n")
+    commit(repo, "add")
+    ok = _standalone(tmp_path, repo, "--base", base)
+    assert ok.returncode == 0, ok.stderr
+    write(repo, "data/forecasts/s/2026-01-01.json", "x\n")
+    commit(repo, "edit")
+    bad = _standalone(tmp_path, repo, "--base", base)
+    assert bad.returncode == 1 and "data/forecasts/s/2026-01-01.json" in bad.stderr
+
+
+def test_guard_file_with_data_in_same_range_is_violation(repo):
+    guards = ("src/ftracker/immutability.py", ".github/workflows/ci.yml", "scripts/commit_and_push.sh")
+    for i, guard in enumerate(guards):
+        base = git(repo, "rev-parse", "HEAD")
+        write(repo, guard, f"changed {guard}\n")
+        commit(repo, "guard")
+        write(repo, f"data/forecasts/s/2026-05-0{i + 1}.json", "1\n")  # an add is enough
+        commit(repo, "data")
+        result = check_guard(repo, base)
+        assert result and guard in result[0]
+        assert main(["--base", base, "--guard", "--repo", str(repo)]) == 1
+        assert check_immutable(repo, base) == []  # adds alone pass the append-only check
+
+
+def test_guard_alone_or_data_alone_is_allowed(repo):
+    base = git(repo, "rev-parse", "HEAD")
+    write(repo, ".github/workflows/ci.yml", "x\n")
+    commit(repo, "ci only")
+    assert check_guard(repo, base) == []
+    base = git(repo, "rev-parse", "HEAD")
+    write(repo, "data/outcomes/s/2026-01-09.json", "1\n")
+    write(repo, "data/gaps/s/2026-01-09.json", "1\n")
+    write(repo, "data/status.json", "{}\n")
+    write(repo, "README.md", "readme\n")
+    commit(repo, "data only")
+    assert check_guard(repo, base) == []
+    assert main(["--base", base, "--guard", "--repo", str(repo)]) == 0
+
+
+def test_guard_lookalike_workflow_dir_is_not_a_guard(repo):
+    base = git(repo, "rev-parse", "HEAD")
+    write(repo, ".github/workflows_old/x.yml", "x\n")
+    write(repo, "data/forecasts/s/2026-01-09.json", "1\n")
+    commit(repo, "both")
+    assert check_guard(repo, base) == []
+
+
+def test_guard_all_zero_base_checks_nothing(repo):
+    assert check_guard(repo, ZERO) == []
+
+
+def test_whole_history_scan_fails_on_an_old_violation(repo):
+    write(repo, "data/forecasts/s/2026-01-01.json", "tampered long ago\n")
+    commit(repo, "old edit")
+    for d in ("02", "03"):
+        write(repo, f"data/forecasts/s/2026-01-{d}.json", "1\n")
+        commit(repo, f"later {d}")
+    recent = git(repo, "rev-parse", "HEAD~1")
+    assert check_immutable(repo, recent) == []  # an incremental check no longer sees it
+    result = check_whole_history(repo)
+    assert result and "data/forecasts/s/2026-01-01.json" in result[0]
+    assert main(["--whole-history", "--repo", str(repo)]) == 1
+
+
+def test_whole_history_clean_repo_passes(repo):
+    write(repo, "data/forecasts/s/2026-01-02.json", "1\n")
+    commit(repo, "add")
+    assert check_whole_history(repo) == []
+    assert main(["--whole-history", "--repo", str(repo)]) == 0
+
+
+def test_whole_history_checks_every_root(repo):
+    main_branch = git(repo, "rev-parse", "--abbrev-ref", "HEAD")
+    git(repo, "checkout", "-q", "--orphan", "other")
+    git(repo, "rm", "-rq", "--cached", ".")
+    for p in list(repo.glob("data/**/*.json")):
+        p.unlink()
+    write(repo, "data/gaps/o/1.json", "1\n")
+    commit(repo, "other root")
+    write(repo, "data/gaps/o/1.json", "2\n")
+    commit(repo, "edit on other root")
+    git(repo, "checkout", "-q", main_branch)
+    git(repo, "merge", "-q", "--allow-unrelated-histories", "-m", "join", "other")
+    assert len(immutability.roots(repo)) == 2
+    assert any("data/gaps/o/1.json" in v for v in check_whole_history(repo))
+
+
+def test_main_requires_base_or_whole_history(repo):
+    assert main(["--repo", str(repo)]) == 2

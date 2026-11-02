@@ -155,3 +155,160 @@ def test_commit_script_passes_bash_syntax_check():
         pytest.skip("bash is not available, so the script syntax cannot be checked")
     done = subprocess.run([bash, "-n", str(SCRIPT)], capture_output=True, text=True)
     assert done.returncode == 0, done.stderr
+
+
+# ---------- CI: checker from the base revision, guard files, whole history ----------
+
+def _ci_steps():
+    doc = yaml.safe_load(CI.read_text(encoding="utf-8"))
+    return [s for job in doc["jobs"].values() for s in job["steps"]]
+
+
+def _imm_bodies():
+    steps = _ci_steps()
+    push = next(s for s in steps if s.get("name") == "Immutability check (push)")
+    pr = next(s for s in steps if s.get("name") == "Immutability check (pull request)")
+    return push, pr
+
+
+def test_ci_runs_checker_copied_from_base_revision():
+    push, pr = _imm_bodies()
+    assert push["if"] == "github.event_name == 'push'"
+    assert pr["if"] == "github.event_name == 'pull_request'"
+    for step, expr in ((push, "${{ github.event.before }}"), (pr, "${{ github.event.pull_request.base.sha }}")):
+        body = step["run"]
+        assert body.splitlines()[0] == f'BASE="{expr}"'
+        assert 'checker="$RUNNER_TEMP/immutability_base.py"' in body
+        assert 'git show "$BASE:src/ftracker/immutability.py" > "$checker"' in body
+        assert 'python "$checker"' in body
+        assert 'run_base --base "$BASE"' in body
+        assert 'run_modes --base "$BASE" --guard' in body
+        assert "run_modes --whole-history" in body
+    # identical apart from the BASE line, so the two events cannot drift apart
+    assert push["run"].splitlines()[1:] == pr["run"].splitlines()[1:]
+    steps = _ci_steps()
+    assert steps.index(push) < steps.index(next(s for s in steps if s.get("run") == "pytest"))
+
+
+def _git(repo, *args):
+    import subprocess
+
+    return subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True, text=True).stdout.strip()
+
+
+def _write(repo, rel, text):
+    p = repo / rel
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(text, encoding="utf-8")
+
+
+def _commit(repo, msg):
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", msg)
+    return _git(repo, "rev-parse", "HEAD")
+
+
+def _ci_repo(tmp_path):
+    git, write, commit = _git, _write, _commit
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    git(repo, "init", "-q")
+    git(repo, "config", "user.name", "Test")
+    git(repo, "config", "user.email", "test@example.com")
+    git(repo, "config", "commit.gpgsign", "false")
+    write(repo, "src/ftracker/immutability.py",
+          (ROOT / "src" / "ftracker" / "immutability.py").read_text(encoding="utf-8"))
+    write(repo, "data/forecasts/s/2026-01-01.json", "1\n")
+    base = commit(repo, "base")
+    return repo, base, commit, write
+
+
+def _run_ci_body(tmp_path, repo, base):
+    import os
+    import shutil
+    import subprocess
+    import sys
+
+    import pytest
+
+    bash = shutil.which("bash")
+    if bash is None:
+        pytest.skip("bash is not available, so the CI step cannot be executed")
+    push, _ = _imm_bodies()
+    body = push["run"].replace("${{ github.event.before }}", base)
+    temp = tmp_path / "runner_temp"
+    temp.mkdir(exist_ok=True)
+    env = dict(os.environ, RUNNER_TEMP=temp.as_posix(),
+               PATH=os.path.dirname(sys.executable) + os.pathsep + os.environ.get("PATH", ""))
+    return subprocess.run([bash, "-eo", "pipefail", "-c", body], cwd=repo, env=env, capture_output=True, text=True)
+
+
+def test_ci_body_uses_base_checker_even_if_head_disables_it(tmp_path):
+    repo, base, commit, write = _ci_repo(tmp_path)
+    write(repo, "src/ftracker/immutability.py", "import sys\nsys.exit(0)\n")
+    write(repo, "data/forecasts/s/2026-01-01.json", "tampered\n")
+    commit(repo, "disable the checker and edit history")
+    done = _run_ci_body(tmp_path, repo, base)
+    assert done.returncode != 0
+    assert "Using the checker from the base revision" in done.stdout
+    assert "data/forecasts/s/2026-01-01.json" in done.stderr
+
+
+def test_ci_body_passes_a_clean_push(tmp_path):
+    repo, base, commit, write = _ci_repo(tmp_path)
+    write(repo, "data/forecasts/s/2026-01-02.json", "1\n")
+    commit(repo, "add")
+    done = _run_ci_body(tmp_path, repo, base)
+    assert done.returncode == 0, done.stdout + done.stderr
+
+
+def test_ci_body_fails_on_guard_file_plus_data(tmp_path):
+    repo, base, commit, write = _ci_repo(tmp_path)
+    write(repo, "scripts/commit_and_push.sh", "echo changed\n")
+    write(repo, "data/forecasts/s/2026-01-02.json", "1\n")
+    commit(repo, "script and data together")
+    done = _run_ci_body(tmp_path, repo, base)
+    assert done.returncode != 0 and "guard files changed" in done.stderr
+
+
+def test_ci_body_whole_history_stays_red_after_an_old_violation(tmp_path):
+    repo, _, commit, write = _ci_repo(tmp_path)
+    write(repo, "data/forecasts/s/2026-01-01.json", "tampered\n")
+    commit(repo, "old edit")
+    write(repo, "data/forecasts/s/2026-01-02.json", "1\n")
+    base = commit(repo, "later")
+    write(repo, "data/forecasts/s/2026-01-03.json", "1\n")
+    commit(repo, "newest")  # this push only adds; the old edit is outside base..HEAD
+    done = _run_ci_body(tmp_path, repo, base)
+    assert done.returncode != 0 and "data/forecasts/s/2026-01-01.json" in done.stderr
+
+
+def test_ci_body_falls_back_to_head_checker_on_first_push(tmp_path):
+    repo, _, commit, write = _ci_repo(tmp_path)
+    write(repo, "data/forecasts/s/2026-01-02.json", "1\n")
+    commit(repo, "add")
+    done = _run_ci_body(tmp_path, repo, "0" * 40)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "using the HEAD version" in done.stdout
+
+
+def test_ci_body_falls_back_when_base_has_no_checker(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _git(repo, "config", "user.name", "Test")
+    _git(repo, "config", "user.email", "test@example.com")
+    _write(repo, "README.md", "no checker yet\n")
+    base = _commit(repo, "before the checker existed")
+    _write(repo, "data/forecasts/s/2026-01-02.json", "1\n")
+    _commit(repo, "add")
+    done = _run_ci_body(tmp_path, repo, base)
+    assert "using the HEAD version" in done.stdout
+    assert done.returncode == 0, done.stdout + done.stderr
+
+
+def test_commit_script_stays_incremental_and_says_why():
+    text = SCRIPT.read_text(encoding="utf-8")
+    assert 'base="$(git rev-parse origin/main)"' in text
+    assert "--whole-history" not in text
+    assert "whole history" in text.lower()

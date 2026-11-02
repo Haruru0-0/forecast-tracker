@@ -22,6 +22,9 @@ for attempt in 1 2 3; do
   base="$(git rev-parse origin/main)"
   git rebase origin/main
   # The sha changed with the rebase, so check again against the remote tip.
+  # Deliberately incremental (base = remote tip), not the whole history scan that
+  # CI runs: one bad commit anywhere in history must keep CI red, but must not
+  # stop the bot from recording new data every day.
   python -m ftracker.immutability --base "$base"
   if git push origin HEAD:main; then
     exit 0

@@ -4,6 +4,10 @@ on:
   push:
   pull_request:
 
+# The immutability checker is taken from the BASE revision, so a push cannot weaken the
+# check that judges it. The HEAD copy is used only when the base has no checker (or no
+# mode it needs) or on the first push of a branch (all-zero base). The two check steps
+# below run the same body; only the BASE line differs.
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -18,9 +22,51 @@ jobs:
         run: pip install -e ".[dev]"
       - name: Immutability check (push)
         if: github.event_name == 'push'
-        run: python -m ftracker.immutability --base ${{ github.event.before }}
+        run: |
+          BASE="${{ github.event.before }}"
+          set -euo pipefail
+          checker="$RUNNER_TEMP/immutability_base.py"
+          if [ -n "$BASE" ] && [ "$(printf '%s' "$BASE" | tr -d 0)" != "" ] \
+              && git cat-file -e "$BASE:src/ftracker/immutability.py" 2>/dev/null; then
+            git show "$BASE:src/ftracker/immutability.py" > "$checker"
+            echo "Using the checker from the base revision $BASE"
+            run_base() { python "$checker" "$@"; }
+          else
+            echo "No checker at the base revision (or first push); using the HEAD version"
+            run_base() { python -m ftracker.immutability "$@"; }
+          fi
+          # Modes added after the base revision fall back to the HEAD version.
+          if [[ "$(run_base --help)" == *--whole-history* ]]; then
+            run_modes() { run_base "$@"; }
+          else
+            run_modes() { python -m ftracker.immutability "$@"; }
+          fi
+          run_base --base "$BASE"
+          run_modes --base "$BASE" --guard
+          run_modes --whole-history
       - name: Immutability check (pull request)
         if: github.event_name == 'pull_request'
-        run: python -m ftracker.immutability --base ${{ github.event.pull_request.base.sha }}
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          set -euo pipefail
+          checker="$RUNNER_TEMP/immutability_base.py"
+          if [ -n "$BASE" ] && [ "$(printf '%s' "$BASE" | tr -d 0)" != "" ] \
+              && git cat-file -e "$BASE:src/ftracker/immutability.py" 2>/dev/null; then
+            git show "$BASE:src/ftracker/immutability.py" > "$checker"
+            echo "Using the checker from the base revision $BASE"
+            run_base() { python "$checker" "$@"; }
+          else
+            echo "No checker at the base revision (or first push); using the HEAD version"
+            run_base() { python -m ftracker.immutability "$@"; }
+          fi
+          # Modes added after the base revision fall back to the HEAD version.
+          if [[ "$(run_base --help)" == *--whole-history* ]]; then
+            run_modes() { run_base "$@"; }
+          else
+            run_modes() { python -m ftracker.immutability "$@"; }
+          fi
+          run_base --base "$BASE"
+          run_modes --base "$BASE" --guard
+          run_modes --whole-history
       - name: Test
         run: pytest
