@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from ftracker.backtest import default_forecasters, run_backtest
 from ftracker.engine import run_daily
 from ftracker.registry import SERIES
 
@@ -45,6 +46,38 @@ def daily(data_dir: Path) -> int:
     return 0 if report.ok else 1
 
 
+def _today(tz: str):
+    return datetime.now(ZoneInfo(tz)).date()
+
+
+def backtest(series: str, days: int, step: int, data_dir: Path) -> int:
+    """Replay the models over past origins; write <data_dir>/backtest/<name>.csv. Returns 1 if any series failed."""
+    selected = [s for s in SERIES.values() if series == "all" or s.name == series]
+    if not selected:
+        print(f"unknown series {series!r}; choose one of: all, " + ", ".join(s.name for s in SERIES.values()))
+        return 2
+    out_dir = Path(data_dir) / "backtest"
+    failed = False
+    for s in selected:
+        try:
+            yesterday = _today(s.tz) - timedelta(days=1)
+            last_origin = yesterday - timedelta(days=7)
+            first_origin = last_origin - timedelta(days=days)
+            origins = [last_origin - timedelta(days=k) for k in range(0, days + 1, step)][::-1]
+            history = s.fetch_daily(first_origin - timedelta(days=730), yesterday)
+            result = run_backtest(history, default_forecasters(), origins)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            result.to_csv(out_dir / f"{s.name}.csv", index=False)
+        except Exception as exc:  # one broken series must never stop the others; type and message only
+            print(f"{s.name}: ERROR {type(exc).__name__}: {exc}")
+            failed = True
+            continue
+        scored = result.dropna(subset=["actual"])
+        print(f"{s.name}: {result['origin'].nunique()} origins ({first_origin}..{last_origin}), "
+              f"{len(result)} forecasts, {len(scored)} with an observed actual")
+    return 1 if failed else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="ftracker")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -55,11 +88,18 @@ def main(argv: list[str] | None = None) -> int:
     site_cmd.add_argument("--data-dir", default="data", help="data directory (default: data)")
     site_cmd.add_argument("--results-dir", default="results", help="results directory (default: results)")
     site_cmd.add_argument("--out", default="site", help="output directory (default: site)")
+    bt_cmd = sub.add_parser("backtest", help="replay the models on past origins (historical, not live)")
+    bt_cmd.add_argument("--series", default="all", help="series name or 'all' (default: all)")
+    bt_cmd.add_argument("--days", type=int, default=180, help="how many days of origins to replay (default: 180)")
+    bt_cmd.add_argument("--step", type=int, default=7, help="days between origins (default: 7)")
+    bt_cmd.add_argument("--data-dir", default="data", help="data directory (default: data)")
     args = parser.parse_args(argv)
     if args.command == "check-sources":
         return check_sources()
     if args.command == "daily":
         return daily(Path(args.data_dir))
+    if args.command == "backtest":
+        return backtest(args.series, args.days, args.step, Path(args.data_dir))
     if args.command == "site":
         from ftracker.site import all_scoreboards, build_site
 
