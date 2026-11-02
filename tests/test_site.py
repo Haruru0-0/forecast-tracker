@@ -486,3 +486,42 @@ def test_backtest_text_explains_horizon_and_origin(tmp_path):
     pd.DataFrame(bt).to_csv(root / "backtest" / "s1.csv", index=False)
     tail = page().split("Backtest (historical, not live)")[1]
     assert "horizon counted from the issue date, as in the live record; origin is the last observed day" in tail
+
+
+def test_header_status_pill_and_summary_counts(tmp_path):
+    root, page = build(tmp_path)
+    make_data(root, issues=3)
+    write_status(root, NOW - timedelta(hours=5))
+    html = _markup(page())
+    assert 'id="live-status" class="status">Live ' in html
+    stats = html.split('<div class="stats">', 1)[1].split("</div></div>", 1)[0]
+    assert "<b>1</b><span>series</span>" in stats and "<b>3</b><span>days tracked</span>" in stats
+    assert "<b>21</b><span>forecasts saved</span>" in stats  # 3 issues x 7 horizons, model rows only
+
+
+def test_stale_status_pill_and_nav_anchors(tmp_path):
+    root, page = build(tmp_path)
+    make_data(root, issues=3)
+    write_status(root, NOW - timedelta(hours=40))
+    html = _markup(page())
+    assert 'id="live-status" class="status stale">Stale ' in html
+    for anchor in ("forecasts", "scoreboard", "baseline", "about"):
+        assert f'href="#{anchor}"' in html and f'id="{anchor}"' in html
+
+
+def test_skill_pill_marks_wins_and_verdict_counts_horizons(tmp_path):
+    root, page = build(tmp_path)
+    make_data(root, issues=14)
+    write_status(root, NOW)
+    html = page()
+    assert '<span class="skill pos">0.50 (n=' in html
+    assert "Model beats the better baseline at <em>7 of 7</em> horizons." in html
+
+
+def test_skill_pill_marks_losses(tmp_path):
+    root, page = build(tmp_path)
+    make_data(root, issues=14, base_off=0.5)  # baselines closer to the truth than the model
+    write_status(root, NOW)
+    html = page()
+    assert '<span class="skill neg">-' in html
+    assert "Model beats the better baseline at <em>0 of 7</em> horizons." in html

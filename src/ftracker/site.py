@@ -141,7 +141,9 @@ def _fan_chart(rows: pd.DataFrame, label: str, unit: str = "") -> str:
         pts = " ".join(f"{x(int(r.horizon)):.1f},{y(r.point):.1f}" for r in m.itertuples())
         parts.append(f'<polyline class="line model" points="{pts}"/>')
         for r in m.itertuples():
-            parts.append(f'<circle class="dot" cx="{x(int(r.horizon)):.1f}" cy="{y(r.point):.1f}" r="3"/>')
+            parts.append(f'<circle class="dot" cx="{x(int(r.horizon)):.1f}" cy="{y(r.point):.1f}" r="4.5">'
+                         f'<title>+{int(r.horizon)}d: {_num(r.point)} {_e(unit)}, 80% {_num(r.lo)} to {_num(r.hi)}'
+                         '</title></circle>')
     for hz in horizons:
         parts.append(f'<text class="tick" x="{x(hz):.1f}" y="{h - 10}" text-anchor="middle">+{hz}d</text>')
     parts.append("</svg>")
@@ -211,16 +213,29 @@ def _tracked(fc: pd.DataFrame, gaps: pd.DataFrame) -> str:
     return f'<p class="muted tracked">days tracked: {days}; gap days: {gap_days}</p>'
 
 
+WHAT = {
+    "weather_tmax": "Daily high temperature",
+    "air_quality_aqi": "Daily mean air quality index",
+    "electricity_peak_mw": "Daily peak electricity demand",
+    "river_discharge_cfs": "Daily mean river flow",
+}
+
+
+def _what(name: str) -> str:
+    return f'<p class="what">{_e(WHAT[name])}, {_e(config.METRO["name"])}</p>' if name in WHAT else ""
+
+
 def _upcoming(name: str, fc: pd.DataFrame, entry: dict | None, unit: str, today: date,
               gaps: pd.DataFrame) -> str:
     newest_gap = None if gaps.empty else gaps["issue_date"].max()
     if fc.empty:
-        return "".join(['<article class="card">', _heading(name, unit), _status_note(entry),
-                        '<p class="muted">no data yet</p>', _tracked(fc, gaps), "</article>"])
+        return "".join(['<article class="card">', _heading(name, unit), _what(name), _status_note(entry),
+                        '<p class="empty">no data yet. The first forecast appears after the next daily run.</p>',
+                        _tracked(fc, gaps), "</article>"])
     latest = fc[fc["issue_date"] == fc["issue_date"].max()]
     issued = latest["issue_date"].iloc[0]
     out = [f'<article class="card" data-last-issue="{_e(issued.isoformat())}">', _heading(name, unit),
-           _status_note(entry), f'<p class="muted">issued {issued.isoformat()}</p>', _tracked(fc, gaps)]
+           _what(name), _status_note(entry), f'<p class="muted">issued {issued.isoformat()}</p>', _tracked(fc, gaps)]
     models = latest[latest["method"] == "model"]
     past = int((models["target_date"] < today).sum())
     if past:
@@ -255,9 +270,19 @@ def _upcoming(name: str, fc: pd.DataFrame, entry: dict | None, unit: str, today:
     return "".join(out)
 
 
+def _verdict(board: pd.DataFrame) -> str:
+    """One headline sentence per series: at how many horizons the model beats the better baseline."""
+    m = board[(board["method"] == "model") & board["skill"].notna() & (board["n_skill"] > 0)]
+    if m.empty:
+        return ""
+    wins = int((m["skill"] > 0).sum())
+    return (f'<p class="verdict">Model beats the better baseline at <em>{wins} of {len(m)}</em> horizons.</p>')
+
+
 def _skill_cell(row: pd.Series) -> str:
     sk = row["skill"]
-    return f'{"n/a" if pd.isna(sk) else f"{sk:.2f}"} (n={int(row["n_skill"])})'
+    kind = "" if pd.isna(sk) else (" pos" if sk > 0 else " neg" if sk < 0 else "")
+    return f'<span class="skill{kind}">{"n/a" if pd.isna(sk) else f"{sk:.2f}"} (n={int(row["n_skill"])})</span>'
 
 
 def _score_table(name: str, board: pd.DataFrame, fc: pd.DataFrame, oc: pd.DataFrame, trends: bool,
@@ -287,42 +312,91 @@ def _score_table(name: str, board: pd.DataFrame, fc: pd.DataFrame, oc: pd.DataFr
 
 
 CSS = """
-:root{--bg:#fbfbf9;--fg:#1d2327;--muted:#5d666d;--card:#fff;--line:#dfe2e0;--accent:#1b6ac9;--band:rgba(27,106,201,.16);
---seasonal_naive:#c2570c;--persistence:#6d7b88;--warn-bg:#fdeaea;--warn-fg:#8f1d1d;--warn-line:#e4a3a3}
-@media (prefers-color-scheme:dark){:root{--bg:#14181b;--fg:#e8eaeb;--muted:#9aa3a9;--card:#1c2226;--line:#2e373c;
---accent:#6aa7f5;--band:rgba(106,167,245,.2);--seasonal_naive:#f09a52;--persistence:#9aa7b4;
---warn-bg:#3a1c1c;--warn-fg:#ffb3b3;--warn-line:#7a3a3a}}
+/* Layout: a dark instrument-style masthead with live status, a sticky section index, then
+   two-column cards (one column on phones). Colour tokens first; dark values override them. */
+:root{--bg:#eef2f1;--surface:#fff;--fg:#0f1b1f;--muted:#55656c;--line:#d5dedb;--soft:#e7eeec;
+--accent:#008a7e;--band:rgba(0,138,126,.15);--seasonal_naive:#b8520a;--persistence:#4f69b0;
+--mast-bg:#0f1b1f;--mast-fg:#eaf3f1;--mast-muted:#9db3b0;--live:#34d399;
+--good:#0b6e3a;--good-bg:#e0f3e8;--bad:#9b2222;--bad-bg:#fbe9e7;--bad-line:#e9b3ac;
+--sans:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",sans-serif;
+--mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,"Liberation Mono",monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#0b1215;--surface:#131c20;--fg:#e6eeee;--muted:#94a6a8;--line:#26343a;
+--soft:#1b272c;--accent:#10a597;--band:rgba(16,165,151,.22);--seasonal_naive:#d9772a;--persistence:#6f8bd6;
+--mast-bg:#16232a;--mast-fg:#eaf3f1;--mast-muted:#8fa5a6;--good:#5fd49a;--good-bg:#12301f;
+--bad:#ffb4ab;--bad-bg:#3a1a19;--bad-line:#7a3a36}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-font-variant-numeric:tabular-nums}
-main{max-width:960px;margin:0 auto;padding:24px 16px 48px}
-h1{font-size:1.6rem;margin:0 0 4px}h2{font-size:1.2rem;margin:36px 0 12px;padding-top:8px;border-top:1px solid var(--line)}
-h3{font-size:1.02rem;margin:0 0 4px;overflow-wrap:anywhere}
-.unit,.muted{color:var(--muted);font-weight:400}.muted{margin:2px 0 8px;font-size:.9rem}
-.rule{color:var(--muted);margin:8px 0}
-.banner{background:var(--warn-bg);color:var(--warn-fg);border:1px solid var(--warn-line);border-radius:8px;padding:10px 14px;margin:14px 0}
-.about li{margin:4px 0}.about a{color:var(--accent)}
-.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin:0 0 16px}
-.note.bad{color:var(--warn-fg);background:var(--warn-bg);border-radius:6px;padding:6px 10px;margin:6px 0;overflow-wrap:anywhere}
-.scroll{overflow-x:auto}
-table{border-collapse:collapse;width:100%;font-size:.92rem}
-th,td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+html{scroll-behavior:smooth;scroll-padding-top:64px}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 var(--sans);font-variant-numeric:tabular-nums;
+-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-underline-offset:3px}
+.wrap{max-width:1120px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));
+padding-right:max(16px,env(safe-area-inset-right,0px))}
+.mast{background:var(--mast-bg);color:var(--mast-fg);padding-block:36px 28px}
+.mast h1{font-size:clamp(1.9rem,4.5vw,2.9rem);line-height:1.05;letter-spacing:-.025em;margin:0 0 10px;font-weight:700}
+.lede{max-width:62ch;margin:0;color:var(--mast-muted);font-size:1.02rem}
+.status{display:inline-flex;align-items:center;gap:8px;font:600 .8rem/1 var(--mono);letter-spacing:.04em;
+text-transform:uppercase;color:var(--mast-fg);margin:0 0 18px}
+.status::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--live);box-shadow:0 0 0 4px rgba(52,211,153,.18)}
+.status.stale::before{background:#f87171;box-shadow:0 0 0 4px rgba(248,113,113,.2)}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;margin:28px 0 0;background:rgba(255,255,255,.12);
+border:1px solid rgba(255,255,255,.12);border-radius:10px;overflow:hidden}
+.stat{background:var(--mast-bg);padding:14px 16px;min-width:0}
+.stat b{display:block;font:700 1.6rem/1.1 var(--mono);letter-spacing:-.02em}
+.stat span{display:block;margin-top:4px;font-size:.78rem;color:var(--mast-muted);text-transform:uppercase;letter-spacing:.06em}
+nav.index{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+nav.index .wrap{display:flex;gap:4px;overflow-x:auto;padding-block:8px;scrollbar-width:none}
+nav.index a{white-space:nowrap;text-decoration:none;color:var(--muted);font-size:.9rem;font-weight:600;padding:6px 12px;border-radius:999px}
+nav.index a:hover,nav.index a:focus-visible{background:var(--soft);color:var(--fg);outline:none}
+main{padding-block:8px 64px}
+section{padding-top:40px}
+h2{font-size:1.35rem;letter-spacing:-.01em;margin:0 0 6px}
+.rule,.muted{color:var(--muted)}
+.rule{max-width:78ch;margin:0 0 18px;font-size:.95rem}
+.muted{margin:2px 0 8px;font-size:.88rem}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:16px;align-items:start}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;min-width:0}
+h3{font:600 .95rem/1.3 var(--mono);margin:0 0 2px;overflow-wrap:anywhere;letter-spacing:-.01em}
+.unit{color:var(--muted);font-weight:400}
+.what{margin:0 0 10px;color:var(--muted);font-size:.9rem}
+.tracked{font:.78rem var(--mono);letter-spacing:.02em}
+.banner,.note.bad{background:var(--bad-bg);color:var(--bad);border:1px solid var(--bad-line);border-radius:10px;
+padding:10px 14px;margin:14px 0;overflow-wrap:anywhere}
+.note.bad{padding:7px 11px;margin:8px 0;font-size:.9rem;border-radius:8px}
+.banner{margin:0;border-radius:0;border-width:0 0 1px}
+.verdict{margin:0 0 6px;font-weight:600}
+.verdict em{font-style:normal;font-family:var(--mono)}
+.empty{border:1px dashed var(--line);border-radius:10px;padding:14px;color:var(--muted);margin:8px 0;font-size:.92rem}
+.scroll{overflow-x:auto;margin:6px -4px 0;padding:0 4px}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{text-align:right;padding:8px 8px;border-bottom:1px solid var(--soft);white-space:nowrap}
 th:first-child,td:first-child{text-align:left}
-th{font-weight:600;color:var(--muted)}
-svg.chart{display:block;width:100%;height:auto;max-width:600px;margin:6px 0}
+th{font:600 .68rem var(--mono);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border-bottom:1px solid var(--line);white-space:normal;vertical-align:bottom}
+tbody tr:last-child td{border-bottom:0}
+td.m strong{font-family:var(--mono);color:var(--accent)}
+tr.past td{color:var(--muted)}
+.skill{display:inline-block;font:600 .8rem var(--mono);padding:2px 8px;border-radius:999px;background:var(--soft);color:var(--muted)}
+.skill.pos{background:var(--good-bg);color:var(--good)}.skill.pos::before{content:"\\25B2  "}
+.skill.neg{background:var(--bad-bg);color:var(--bad)}.skill.neg::before{content:"\\25BC  "}
+svg.chart{display:block;width:100%;height:auto;margin:8px 0 4px}
 svg.trend{width:120px;height:30px;vertical-align:middle}
-.grid{stroke:var(--line);stroke-width:1}.tick{fill:var(--muted);font-size:21px}
-.band{fill:var(--band)}.line{fill:none;stroke-width:2;stroke-linejoin:round}
-.line.model{stroke:var(--accent)}.line.seasonal_naive{stroke:var(--seasonal_naive);stroke-dasharray:5 3}
-.line.persistence{stroke:var(--persistence);stroke-dasharray:2 3}
-.dot{fill:var(--accent)}.bar.model{fill:var(--accent)}.bar.seasonal_naive{fill:var(--seasonal_naive)}
-.bar.persistence{fill:var(--persistence)}
-tr.past td{color:var(--muted)}.legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:.85rem;color:var(--muted);margin:2px 0 10px}
-.key::before{content:"";display:inline-block;width:14px;height:0;border-top:3px solid;margin-right:6px;vertical-align:middle}
-.key.model::before{border-color:var(--accent)}.key.seasonal_naive::before{border-color:var(--seasonal_naive)}
-.key.persistence::before{border-color:var(--persistence)}
-td.m{white-space:normal}td.m .muted{display:block;white-space:nowrap;margin:0;font-size:.85em}
-@media (max-width:480px){table{font-size:.85rem}th{white-space:normal;vertical-align:bottom}td.m{min-width:0}svg.trend{width:48px}th,td{padding:6px 3px}td:first-child{white-space:normal}.d{white-space:nowrap}td .muted{font-size:.8em}main{padding-top:16px}h1{font-size:1.35rem}.card{padding:10px}}
+.grid{stroke:var(--line);stroke-width:1;stroke-dasharray:2 4}.tick{fill:var(--muted);font:20px var(--mono)}
+.band{fill:var(--band)}.line{fill:none;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.line.model{stroke:var(--accent);stroke-width:3}.line.seasonal_naive{stroke:var(--seasonal_naive);stroke-dasharray:6 4}
+.line.persistence{stroke:var(--persistence);stroke-dasharray:1 5}
+.dot{fill:var(--accent);stroke:var(--surface);stroke-width:2.5}
+.bar{rx:3px}.bar.model{fill:var(--accent)}.bar.seasonal_naive{fill:var(--seasonal_naive)}.bar.persistence{fill:var(--persistence)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:.82rem;color:var(--muted);margin:2px 0 10px}
+.key::before{content:"";display:inline-block;width:16px;height:0;border-top:3px solid;margin-right:6px;vertical-align:middle}
+.key.model::before{border-color:var(--accent)}.key.seasonal_naive::before{border-color:var(--seasonal_naive);border-top-style:dashed}
+.key.persistence::before{border-color:var(--persistence);border-top-style:dotted}
+td.m{white-space:normal}td.m .muted{display:block;white-space:nowrap;margin:0;font-size:.8em}
+.about ul{padding-left:1.2em;margin:6px 0 14px}.about li{margin:6px 0}
+footer{color:var(--muted);font-size:.85rem;padding-bottom:40px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+@media (max-width:640px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.mast{padding-block:24px 20px}
+.card{padding:14px;border-radius:12px}section{padding-top:32px}th,td{padding:7px 4px}table{font-size:.84rem}
+th{white-space:normal;vertical-align:bottom}td:first-child{white-space:normal}.d{white-space:nowrap}svg.trend{width:48px}}
 """
 
 
@@ -345,6 +419,11 @@ SCRIPT = """
       banner.appendChild(document.createTextNode(" the last run was " + Math.floor((now - last) / HOUR) +
         " hours ago; scores below may be out of date."));
       banner.hidden = false;
+      var pill = document.getElementById("live-status");
+      if (pill) {
+        pill.classList.add("stale");
+        pill.firstChild.textContent = "Stale ";
+      }
     }
   }
   var cards = document.querySelectorAll("[data-last-issue]");
@@ -441,6 +520,7 @@ def build_site(root: Path, out_dir: Path, now: datetime, series_names: list[str]
     today = now.date()
 
     last_run_txt = "never"
+    status_class, status_word = " stale", "Stale"
     if status is None:
         banner = ('<div id="stale-banner" class="banner" role="alert" data-last-run="">'
                   f'<strong>STALE</strong> no run recorded yet (status.json is {_e(problem)}).</div>')
@@ -454,6 +534,7 @@ def build_site(root: Path, out_dir: Path, now: datetime, series_names: list[str]
                       'scores below may be out of date.</div>')
         else:  # hidden, and filled in by the script once the viewer's clock says it is stale
             banner = f"<div {attr} hidden></div>"
+            status_class, status_word = "", "Live"
 
     data = {}
     for name in series_names:
@@ -468,9 +549,10 @@ def build_site(root: Path, out_dir: Path, now: datetime, series_names: list[str]
     score_cards = []
     for n in series_names:
         fc, oc = data[n]
-        card = ['<article class="card">', _heading(n, units[n]), _status_note(entries.get(n))]
+        card = ['<article class="card">', _heading(n, units[n]), _what(n), _status_note(entries.get(n))]
         if boards[n].empty:
-            card.append('<p class="muted">no data yet</p>')
+            card.append('<p class="empty">no data yet. Scores start once the first outcomes arrive '
+                        '(a target is scored two days after it ends).</p>')
         else:
             card.append(_score_table(n, boards[n], fc, oc, trends=True, unit=units[n]))
             card.append(_gap_line(n, root))
@@ -479,14 +561,19 @@ def build_site(root: Path, out_dir: Path, now: datetime, series_names: list[str]
 
     compare = []
     for n in series_names:
-        compare.append('<article class="card">' + _heading(n, units[n]))
+        compare.append('<article class="card">' + _heading(n, units[n]) + _what(n))
         if boards[n].empty:
-            compare.append('<p class="muted">no data yet</p>')
+            compare.append('<p class="empty">no data yet. The comparison appears with the first scored forecasts.</p>')
         else:
-            compare.append(_mae_bars(boards[n], f"{n}: mean absolute error by horizon, model vs baselines", units[n]))
-            compare.append(_legend("model"))
-            compare.append('<p class="muted">Mean absolute error per horizon, lower is better. Skill is '
-                           'shown in the scoreboard above.</p>')
+            compare.append(_verdict(boards[n]))
+            bars = _mae_bars(boards[n], f"{n}: mean absolute error by horizon, model vs baselines", units[n])
+            if bars.startswith("<svg"):
+                compare.append(bars)
+                compare.append(_legend("model"))
+                compare.append('<p class="muted">Mean absolute error per horizon, lower is better. Skill is '
+                               'shown in the scoreboard above.</p>')
+            else:
+                compare.append('<p class="empty">no scored forecasts yet. The bars appear with the first outcomes.</p>')
         compare.append("</article>")
 
     backtest = []
@@ -502,31 +589,51 @@ def build_site(root: Path, out_dir: Path, now: datetime, series_names: list[str]
             backtest.append('<article class="card">' + _heading(n, units[n])
                             + _score_table(n, bb, pd.DataFrame(), pd.DataFrame(), trends=False, unit=units[n])
                             + "</article>")
+    saved = sum(int((data[n][0]["method"] == "model").sum()) for n in series_names if not data[n][0].empty)
+    scored = sum(int(boards[n].loc[boards[n]["method"] == "model", "n"].sum()) for n in series_names
+                 if not boards[n].empty)
+    days = max((int(data[n][0]["issue_date"].nunique()) for n in series_names if not data[n][0].empty), default=0)
+    stats = ('<div class="stats">'
+             + "".join(f'<div class="stat"><b>{v:,}</b><span>{label}</span></div>'
+                       for v, label in ((len(series_names), "series"), (days, "days tracked"),
+                                        (saved, "forecasts saved"), (scored, "forecasts scored")))
+             + "</div>")
+    nav_backtest = '<a href="#backtest">Backtest</a>' if backtest else ""
     backtest_html = ""
     if backtest:
-        backtest_html = (f"<h2>{BACKTEST_TITLE}</h2>"
+        backtest_html = (f'<section id="backtest"><h2>{BACKTEST_TITLE}</h2>'
                          '<p class="rule">Walk-forward replay on past data. Kept apart from the live numbers above. '
                          'Each replayed forecast is issued the day after its origin; horizon counted from the issue '
                          'date, as in the live record; origin is the last observed day.</p>'
-                         + "".join(backtest))
+                         f'<div class="cards">{"".join(backtest)}</div></section>')
 
     page = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <title>Forecast tracker</title><style>{CSS}</style></head>
-<body><main>
+<body>
+<header class="mast"><div class="wrap">
+<p id="live-status" class="status{status_class}">{status_word} <span>&middot; last run {_e(last_run_txt)}</span></p>
 <h1>Forecast tracker</h1>
-<p class="muted">Last run: {_e(last_run_txt)}</p>
+<p class="lede">Forecasts for {_e(config.METRO["name"])} are saved before the outcome is known, never edited, and
+scored against two naive baselines. A model that loses to them is shown losing.</p>
+{stats}
+</div></header>
 {banner}
+<nav class="index" aria-label="Sections"><div class="wrap">
+<a href="#forecasts">Forecasts</a><a href="#scoreboard">Scores</a><a href="#baseline">Vs baseline</a>{nav_backtest}<a href="#about">About</a>
+</div></nav>
+<main class="wrap">
+<section id="forecasts"><h2>Upcoming forecasts</h2>
 <p class="rule">Every forecast is saved before its outcome is known and never edited. CI fails if a past file changes.</p>
-<h2>Upcoming forecasts</h2>{upcoming}
-<h2>Scoreboard per horizon</h2>
+<div class="cards">{upcoming}</div></section>
+<section id="scoreboard"><h2>Scoreboard per horizon</h2>
 <p class="rule">n is the number of scored forecasts. Skill compares the model with the better baseline on the days all three were scored (n shown with it); n/a when undefined.</p>
-{"".join(score_cards)}
-<h2>Model vs baseline</h2>{"".join(compare)}
+<div class="cards">{"".join(score_cards)}</div></section>
+<section id="baseline"><h2>Model vs baseline</h2><div class="cards">{"".join(compare)}</div></section>
 {backtest_html}
-{_about(series_names, os.environ.get("GITHUB_REPOSITORY"))}
+<section>{_about(series_names, os.environ.get("GITHUB_REPOSITORY"))}</section>
 </main>
 <script>{SCRIPT}</script>
 </body></html>
