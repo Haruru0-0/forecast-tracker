@@ -1,0 +1,115 @@
+"""EIA fixtures are HAND-BUILT from the documented v2 response format (no API key was available)."""
+import json
+from datetime import date
+from pathlib import Path
+
+import numpy as np
+import pytest
+import responses
+
+from ftracker import registry
+from ftracker.series import SourceError
+from ftracker.sources import eia
+
+FIX = Path(__file__).parent / "fixtures"
+TZ = "America/Chicago"
+KEY = "SECRET-KEY-123"
+TODAY = date(2026, 11, 20)
+
+
+def _load(name):
+    return json.loads((FIX / name).read_text(encoding="utf-8"))
+
+
+def _fetch(start=date(2026, 10, 30), end=date(2026, 10, 31), today=TODAY):
+    return eia.fetch_eia_demand(KEY, "ERCO", TZ, start, end, today=today)
+
+
+def test_eia_missing_key_raises_without_network(monkeypatch):
+    monkeypatch.delenv("EIA_API_KEY", raising=False)
+    with responses.RequestsMock():  # nothing registered: any request fails the test
+        with pytest.raises(SourceError, match="EIA_API_KEY not set"):
+            registry.SERIES["electricity"].fetch_daily(date(2026, 10, 30), date(2026, 10, 31))
+
+
+@responses.activate
+def test_eia_collects_all_pages(monkeypatch):
+    # Fixture: 72 hourly rows, 2026-10-30T00Z..2026-11-01T23Z; page 1 holds 48, page 2 the other 24.
+    monkeypatch.setattr(eia, "PAGE_LENGTH", 48)
+    responses.add(responses.GET, eia.URL, json=_load("eia_page1.json"))
+    responses.add(responses.GET, eia.URL, json=_load("eia_page2.json"))
+    s = _fetch(end=date(2026, 11, 1))
+    assert len(responses.calls) == 2
+    assert "offset=0" in responses.calls[0].request.url
+    assert "offset=48" in responses.calls[1].request.url
+    assert "length=48" in responses.calls[0].request.url
+    assert f"api_key={KEY}" in responses.calls[0].request.url
+    # Oct 30 and Oct 31 local days lie entirely in page 1; Nov 1 (25 h, DST ends) is cut off at 23Z.
+    assert s.loc[date(2026, 10, 30)] == 40280.0
+    assert s.loc[date(2026, 10, 31)] == 40520.0
+    assert np.isnan(s.loc[date(2026, 11, 1)])
+
+
+@responses.activate
+def test_eia_rows_from_second_page_are_used(monkeypatch):
+    monkeypatch.setattr(eia, "PAGE_LENGTH", 48)
+    p1, p2 = _load("eia_page1.json"), _load("eia_page2.json")
+    # Move the Oct 31 rows into page 2 only: the day is complete only if page 2 was fetched.
+    keep = [r for r in p1["response"]["data"] if r["period"] <= "2026-10-31T04"]
+    rest = [r for r in p1["response"]["data"] if r["period"] > "2026-10-31T04"]
+    p1["response"]["data"] = keep[:24]
+    p1["response"]["total"] = str(len(keep))
+    p2["response"]["data"] = keep[24:]
+    p2["response"]["total"] = str(len(keep))
+    assert rest  # sanity: fixture had extra rows we dropped
+    monkeypatch.setattr(eia, "PAGE_LENGTH", 24)
+    responses.add(responses.GET, eia.URL, json=p1)
+    responses.add(responses.GET, eia.URL, json=p2)
+    s = _fetch(end=date(2026, 10, 30))
+    assert len(responses.calls) == 2
+    assert s.loc[date(2026, 10, 30)] == 40280.0  # hour 28 (last row of the day) sits on page 2
+
+
+@responses.activate
+def test_eia_peak_is_max_per_local_day():
+    rows = []
+    for h in range(24):  # Chicago 2026-10-30 = 05Z .. 04Z next day
+        utc = 5 + h
+        period = f"2026-10-30T{utc:02d}" if utc < 24 else f"2026-10-31T{utc - 24:02d}"
+        rows.append({"period": period, "respondent": "ERCO", "type": "D",
+                     "value": "60000" if h == 10 else "40000"})
+    responses.add(responses.GET, eia.URL, json={"response": {"total": "24", "data": rows}})
+    s = _fetch(end=date(2026, 10, 30))
+    assert s.loc[date(2026, 10, 30)] == 60000.0
+
+
+@responses.activate
+def test_eia_empty_response_returns_all_nan_for_range():
+    responses.add(responses.GET, eia.URL, json={"response": {"total": "0", "data": []}})
+    s = _fetch(start=date(2026, 10, 28), end=date(2026, 10, 31))
+    assert list(s.index) == [date(2026, 10, d) for d in range(28, 32)]
+    assert s.isna().all()
+    assert s.dtype == float
+
+
+@responses.activate
+def test_eia_masks_today_and_later():
+    responses.add(responses.GET, eia.URL, json=_load("eia_page1.json"))
+    s = _fetch(today=date(2026, 10, 31))
+    assert s.loc[date(2026, 10, 30)] == 40280.0
+    assert np.isnan(s.loc[date(2026, 10, 31)])
+
+
+@responses.activate
+def test_eia_error_never_leaks_key():
+    responses.add(responses.GET, eia.URL, status=403)
+    with pytest.raises(SourceError) as ei:
+        _fetch()
+    assert KEY not in str(ei.value)
+
+
+@responses.activate
+def test_eia_malformed_payload_raises_source_error():
+    responses.add(responses.GET, eia.URL, json={"error": "bad"})
+    with pytest.raises(SourceError):
+        _fetch()

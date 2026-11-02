@@ -1,0 +1,450 @@
+{
+ "_note": "HAND-BUILT from the EIA v2 documented response format (api.eia.gov/v2/electricity/rto/region-data/data); not a live response.",
+ "response": {
+  "total": "72",
+  "dateFormat": "YYYY-MM-DD\"T\"HH24",
+  "frequency": "hourly",
+  "data": [
+   {
+    "period": "2026-10-30T00",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40000",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-30T01",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40010",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-30T02",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40020",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-30T03",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40030",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-30T04",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40040",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-30T05",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40050",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-30T06",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40060",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-30T07",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40070",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-30T08",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40080",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-30T09",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40090",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-30T10",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40100",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-30T11",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40110",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-30T12",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40120",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-30T13",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40130",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-30T14",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40140",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-30T15",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40150",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-30T16",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40160",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-30T17",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40170",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-30T18",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40180",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-30T19",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40190",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-30T20",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40200",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-30T21",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40210",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-30T22",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40220",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-30T23",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40230",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-31T00",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40240",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-31T01",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40250",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-31T02",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40260",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-31T03",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40270",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-31T04",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40280",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-31T05",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40290",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-31T06",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40300",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-31T07",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40310",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-31T08",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40320",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-31T09",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40330",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-31T10",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40340",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-31T11",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40350",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-31T12",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40360",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-31T13",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40370",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-31T14",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40380",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-31T15",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40390",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-31T16",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40400",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-31T17",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40410",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-31T18",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40420",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-31T19",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40430",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-31T20",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40440",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-31T21",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40450",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-31T22",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40460",
+    "value-units": "megawatthours"
+   },
+   {
+    "period": "2026-10-31T23",
+    "respondent": "ERCO",
+    "respondent-name": "Electric Reliability Council of Texas, Inc.",
+    "type": "D",
+    "type-name": "Demand",
+    "value": "40470",
+    "value-units": "megawatthours"
+   }
+  ],
+  "description": "hand-built"
+ },
+ "request": {
+  "command": "/v2/electricity/rto/region-data/data/",
+  "params": {
+   "frequency": "hourly"
+  }
+ },
+ "apiVersion": "2.1.0"
+}

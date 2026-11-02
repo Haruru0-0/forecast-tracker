@@ -7,31 +7,19 @@ import sys
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from ftracker.config import METRO
-from ftracker.series import Series, SourceError
-from ftracker.sources import openmeteo
-
-
-def registry() -> list[Series]:
-    """All registered series. Task 4 adds electricity demand and river level."""
-    m = METRO
-    return [
-        Series("weather_tmax", "degC", m["tz"],
-               lambda s, e: openmeteo.fetch_weather(m["lat"], m["lon"], m["tz"], s, e)),
-        Series("air_quality_aqi", "US AQI", m["tz"],
-               lambda s, e: openmeteo.fetch_air_quality(m["lat"], m["lon"], m["tz"], s, e)),
-    ]
+from ftracker.registry import SERIES
+from ftracker.series import SourceError
 
 
 def check_sources(lookback_days: int = 10) -> int:
     """Print each series' most recent non-missing date. Returns 1 if any source fails."""
     failed = False
-    for series in registry():
+    for series in SERIES.values():
         today = datetime.now(ZoneInfo(series.tz)).date()
         try:
             data = series.fetch_daily(today - timedelta(days=lookback_days), today - timedelta(days=1)).dropna()
-        except SourceError as exc:
-            print(f"{series.name}: ERROR {exc}")
+        except (SourceError, ValueError, TypeError, KeyError) as exc:  # a bad payload must not end the loop
+            print(f"{series.name}: ERROR {type(exc).__name__}: {exc}")
             failed = True
             continue
         latest = data.index.max() if len(data) else None
