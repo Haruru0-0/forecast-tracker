@@ -4,9 +4,6 @@ on:
   push:
   schedule:
     - cron: '17 3 * * *'
-  workflow_run:
-    workflows: [daily]
-    types: [completed]
   workflow_dispatch:
 
 permissions:
