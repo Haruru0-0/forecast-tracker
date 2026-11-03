@@ -32,6 +32,27 @@ python scripts/render_readme.py # refreshes the results block below
 <!-- results:start -->
 | series | method | horizon | n | n missing | MAE (n) | coverage (n) | skill (n) |
 |---|---|---|---|---|---|---|---|
+| weather_tmax | model | 1 | 0 | 0 | - | - | - (n=0) |
+| weather_tmax | model | 2 | 0 | 0 | - | - | - (n=0) |
+| weather_tmax | model | 3 | 0 | 0 | - | - | - (n=0) |
+| weather_tmax | model | 4 | 0 | 0 | - | - | - (n=0) |
+| weather_tmax | model | 5 | 0 | 0 | - | - | - (n=0) |
+| weather_tmax | model | 6 | 0 | 0 | - | - | - (n=0) |
+| weather_tmax | model | 7 | 0 | 0 | - | - | - (n=0) |
+| weather_tmax | persistence | 1 | 0 | 0 | - | - | - (n=0) |
+| weather_tmax | persistence | 2 | 0 | 0 | - | - | - (n=0) |
+| weather_tmax | persistence | 3 | 0 | 0 | - | - | - (n=0) |
+| weather_tmax | persistence | 4 | 0 | 0 | - | - | - (n=0) |
+| weather_tmax | persistence | 5 | 0 | 0 | - | - | - (n=0) |
+| weather_tmax | persistence | 6 | 0 | 0 | - | - | - (n=0) |
+| weather_tmax | persistence | 7 | 0 | 0 | - | - | - (n=0) |
+| weather_tmax | seasonal_naive | 1 | 0 | 0 | - | - | - (n=0) |
+| weather_tmax | seasonal_naive | 2 | 0 | 0 | - | - | - (n=0) |
+| weather_tmax | seasonal_naive | 3 | 0 | 0 | - | - | - (n=0) |
+| weather_tmax | seasonal_naive | 4 | 0 | 0 | - | - | - (n=0) |
+| weather_tmax | seasonal_naive | 5 | 0 | 0 | - | - | - (n=0) |
+| weather_tmax | seasonal_naive | 6 | 0 | 0 | - | - | - (n=0) |
+| weather_tmax | seasonal_naive | 7 | 0 | 0 | - | - | - (n=0) |
 | air_quality_aqi | model | 1 | 0 | 0 | - | - | - (n=0) |
 | air_quality_aqi | model | 2 | 0 | 0 | - | - | - (n=0) |
 | air_quality_aqi | model | 3 | 0 | 0 | - | - | - (n=0) |
