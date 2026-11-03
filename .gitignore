@@ -6,3 +6,5 @@ __pycache__/
 site/
 .tiered-powers/
 *.part
+graphify-out
+.claude/.memory-state
