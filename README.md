@@ -53,63 +53,63 @@ python scripts/render_readme.py # refreshes the results block below
 | weather_tmax | seasonal_naive | 5 | 0 | 0 | - | - | - (n=0) |
 | weather_tmax | seasonal_naive | 6 | 0 | 0 | - | - | - (n=0) |
 | weather_tmax | seasonal_naive | 7 | 0 | 0 | - | - | - (n=0) |
-| air_quality_aqi | model | 1 | 0 | 0 | - | - | - (n=0) |
+| air_quality_aqi | model | 1 | 1 | 0 | 2.535 (n=1) | 1.00 (n=1) | -1.77 (n=1) |
 | air_quality_aqi | model | 2 | 0 | 0 | - | - | - (n=0) |
 | air_quality_aqi | model | 3 | 0 | 0 | - | - | - (n=0) |
 | air_quality_aqi | model | 4 | 0 | 0 | - | - | - (n=0) |
 | air_quality_aqi | model | 5 | 0 | 0 | - | - | - (n=0) |
 | air_quality_aqi | model | 6 | 0 | 0 | - | - | - (n=0) |
 | air_quality_aqi | model | 7 | 0 | 0 | - | - | - (n=0) |
-| air_quality_aqi | persistence | 1 | 0 | 0 | - | - | - (n=0) |
+| air_quality_aqi | persistence | 1 | 1 | 0 | 9.145 (n=1) | 1.00 (n=1) | - (n=0) |
 | air_quality_aqi | persistence | 2 | 0 | 0 | - | - | - (n=0) |
 | air_quality_aqi | persistence | 3 | 0 | 0 | - | - | - (n=0) |
 | air_quality_aqi | persistence | 4 | 0 | 0 | - | - | - (n=0) |
 | air_quality_aqi | persistence | 5 | 0 | 0 | - | - | - (n=0) |
 | air_quality_aqi | persistence | 6 | 0 | 0 | - | - | - (n=0) |
 | air_quality_aqi | persistence | 7 | 0 | 0 | - | - | - (n=0) |
-| air_quality_aqi | seasonal_naive | 1 | 0 | 0 | - | - | - (n=0) |
+| air_quality_aqi | seasonal_naive | 1 | 1 | 0 | 0.917 (n=1) | 1.00 (n=1) | - (n=0) |
 | air_quality_aqi | seasonal_naive | 2 | 0 | 0 | - | - | - (n=0) |
 | air_quality_aqi | seasonal_naive | 3 | 0 | 0 | - | - | - (n=0) |
 | air_quality_aqi | seasonal_naive | 4 | 0 | 0 | - | - | - (n=0) |
 | air_quality_aqi | seasonal_naive | 5 | 0 | 0 | - | - | - (n=0) |
 | air_quality_aqi | seasonal_naive | 6 | 0 | 0 | - | - | - (n=0) |
 | air_quality_aqi | seasonal_naive | 7 | 0 | 0 | - | - | - (n=0) |
-| electricity_peak_mw | model | 1 | 0 | 0 | - | - | - (n=0) |
+| electricity_peak_mw | model | 1 | 1 | 0 | 1711.733 (n=1) | 1.00 (n=1) | -0.50 (n=1) |
 | electricity_peak_mw | model | 2 | 0 | 0 | - | - | - (n=0) |
 | electricity_peak_mw | model | 3 | 0 | 0 | - | - | - (n=0) |
 | electricity_peak_mw | model | 4 | 0 | 0 | - | - | - (n=0) |
 | electricity_peak_mw | model | 5 | 0 | 0 | - | - | - (n=0) |
 | electricity_peak_mw | model | 6 | 0 | 0 | - | - | - (n=0) |
 | electricity_peak_mw | model | 7 | 0 | 0 | - | - | - (n=0) |
-| electricity_peak_mw | persistence | 1 | 0 | 0 | - | - | - (n=0) |
+| electricity_peak_mw | persistence | 1 | 1 | 0 | 3008.000 (n=1) | 1.00 (n=1) | - (n=0) |
 | electricity_peak_mw | persistence | 2 | 0 | 0 | - | - | - (n=0) |
 | electricity_peak_mw | persistence | 3 | 0 | 0 | - | - | - (n=0) |
 | electricity_peak_mw | persistence | 4 | 0 | 0 | - | - | - (n=0) |
 | electricity_peak_mw | persistence | 5 | 0 | 0 | - | - | - (n=0) |
 | electricity_peak_mw | persistence | 6 | 0 | 0 | - | - | - (n=0) |
 | electricity_peak_mw | persistence | 7 | 0 | 0 | - | - | - (n=0) |
-| electricity_peak_mw | seasonal_naive | 1 | 0 | 0 | - | - | - (n=0) |
+| electricity_peak_mw | seasonal_naive | 1 | 1 | 0 | 1140.000 (n=1) | 1.00 (n=1) | - (n=0) |
 | electricity_peak_mw | seasonal_naive | 2 | 0 | 0 | - | - | - (n=0) |
 | electricity_peak_mw | seasonal_naive | 3 | 0 | 0 | - | - | - (n=0) |
 | electricity_peak_mw | seasonal_naive | 4 | 0 | 0 | - | - | - (n=0) |
 | electricity_peak_mw | seasonal_naive | 5 | 0 | 0 | - | - | - (n=0) |
 | electricity_peak_mw | seasonal_naive | 6 | 0 | 0 | - | - | - (n=0) |
 | electricity_peak_mw | seasonal_naive | 7 | 0 | 0 | - | - | - (n=0) |
-| river_discharge_cfs | model | 1 | 0 | 0 | - | - | - (n=0) |
+| river_discharge_cfs | model | 1 | 1 | 0 | 4.209 (n=1) | 1.00 (n=1) | 0.94 (n=1) |
 | river_discharge_cfs | model | 2 | 0 | 0 | - | - | - (n=0) |
 | river_discharge_cfs | model | 3 | 0 | 0 | - | - | - (n=0) |
 | river_discharge_cfs | model | 4 | 0 | 0 | - | - | - (n=0) |
 | river_discharge_cfs | model | 5 | 0 | 0 | - | - | - (n=0) |
 | river_discharge_cfs | model | 6 | 0 | 0 | - | - | - (n=0) |
 | river_discharge_cfs | model | 7 | 0 | 0 | - | - | - (n=0) |
-| river_discharge_cfs | persistence | 1 | 0 | 0 | - | - | - (n=0) |
+| river_discharge_cfs | persistence | 1 | 1 | 0 | 69.745 (n=1) | 1.00 (n=1) | - (n=0) |
 | river_discharge_cfs | persistence | 2 | 0 | 0 | - | - | - (n=0) |
 | river_discharge_cfs | persistence | 3 | 0 | 0 | - | - | - (n=0) |
 | river_discharge_cfs | persistence | 4 | 0 | 0 | - | - | - (n=0) |
 | river_discharge_cfs | persistence | 5 | 0 | 0 | - | - | - (n=0) |
 | river_discharge_cfs | persistence | 6 | 0 | 0 | - | - | - (n=0) |
 | river_discharge_cfs | persistence | 7 | 0 | 0 | - | - | - (n=0) |
-| river_discharge_cfs | seasonal_naive | 1 | 0 | 0 | - | - | - (n=0) |
+| river_discharge_cfs | seasonal_naive | 1 | 1 | 0 | 77.105 (n=1) | 1.00 (n=1) | - (n=0) |
 | river_discharge_cfs | seasonal_naive | 2 | 0 | 0 | - | - | - (n=0) |
 | river_discharge_cfs | seasonal_naive | 3 | 0 | 0 | - | - | - (n=0) |
 | river_discharge_cfs | seasonal_naive | 4 | 0 | 0 | - | - | - (n=0) |
