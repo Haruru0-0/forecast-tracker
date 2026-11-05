@@ -1,0 +1,178 @@
+{
+  "issue_date": "2026-11-05",
+  "meta": {
+    "run_id": "42017173076",
+    "issued_at": "2026-11-05T11:13:41.743735+00:00",
+    "last_observed": "2026-11-04"
+  },
+  "rows": [
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-06",
+      "horizon": 1,
+      "point": 27.4,
+      "lo": 22.3,
+      "hi": 31.099999999999994
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-07",
+      "horizon": 2,
+      "point": 27.8,
+      "lo": 22.700000000000003,
+      "hi": 31.499999999999996
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-08",
+      "horizon": 3,
+      "point": 29.2,
+      "lo": 24.1,
+      "hi": 32.9
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-09",
+      "horizon": 4,
+      "point": 28.9,
+      "lo": 23.8,
+      "hi": 32.599999999999994
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-10",
+      "horizon": 5,
+      "point": 27.6,
+      "lo": 22.500000000000004,
+      "hi": 31.299999999999997
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-11",
+      "horizon": 6,
+      "point": 24.2,
+      "lo": 19.1,
+      "hi": 27.899999999999995
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-12",
+      "horizon": 7,
+      "point": 28.3,
+      "lo": 22.909999999999997,
+      "hi": 32.7
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-06",
+      "horizon": 1,
+      "point": 24.2,
+      "lo": 20.8,
+      "hi": 27.020000000000003
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-07",
+      "horizon": 2,
+      "point": 24.2,
+      "lo": 20.1,
+      "hi": 27.2
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-08",
+      "horizon": 3,
+      "point": 24.2,
+      "lo": 20.2,
+      "hi": 27.610000000000003
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-09",
+      "horizon": 4,
+      "point": 24.2,
+      "lo": 19.490000000000002,
+      "hi": 28.11
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-10",
+      "horizon": 5,
+      "point": 24.2,
+      "lo": 19.200000000000003,
+      "hi": 27.909999999999997
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-11",
+      "horizon": 6,
+      "point": 24.2,
+      "lo": 19.1,
+      "hi": 27.899999999999995
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-12",
+      "horizon": 7,
+      "point": 24.2,
+      "lo": 18.799999999999997,
+      "hi": 27.999999999999996
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-06",
+      "horizon": 1,
+      "point": 24.708484903807964,
+      "lo": 22.048704159066176,
+      "hi": 28.145891145708724
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-07",
+      "horizon": 2,
+      "point": 24.663800746245844,
+      "lo": 22.070241839475734,
+      "hi": 27.98760827254752
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-08",
+      "horizon": 3,
+      "point": 24.288967145853523,
+      "lo": 20.972919893678313,
+      "hi": 27.709073408197455
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-09",
+      "horizon": 4,
+      "point": 25.85303949076143,
+      "lo": 22.104930355535856,
+      "hi": 29.560984798292843
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-10",
+      "horizon": 5,
+      "point": 27.19483292697351,
+      "lo": 23.63515340401043,
+      "hi": 30.82782237608404
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-11",
+      "horizon": 6,
+      "point": 26.485754611529643,
+      "lo": 22.964807203201254,
+      "hi": 30.461765205706588
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-12",
+      "horizon": 7,
+      "point": 26.50168490529404,
+      "lo": 23.177946330255864,
+      "hi": 30.52031136749312
+    }
+  ]
+}
