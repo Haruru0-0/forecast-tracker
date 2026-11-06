@@ -1,0 +1,178 @@
+{
+  "issue_date": "2026-11-06",
+  "meta": {
+    "run_id": "42208300490",
+    "issued_at": "2026-11-06T11:11:21.834630+00:00",
+    "last_observed": "2026-11-05"
+  },
+  "rows": [
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-07",
+      "horizon": 1,
+      "point": 27.8,
+      "lo": 22.700000000000003,
+      "hi": 31.499999999999996
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-08",
+      "horizon": 2,
+      "point": 29.2,
+      "lo": 24.1,
+      "hi": 32.9
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-09",
+      "horizon": 3,
+      "point": 28.9,
+      "lo": 23.8,
+      "hi": 32.599999999999994
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-10",
+      "horizon": 4,
+      "point": 27.6,
+      "lo": 22.500000000000004,
+      "hi": 31.299999999999997
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-11",
+      "horizon": 5,
+      "point": 24.7,
+      "lo": 19.6,
+      "hi": 28.399999999999995
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-12",
+      "horizon": 6,
+      "point": 25.7,
+      "lo": 20.6,
+      "hi": 29.399999999999995
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-13",
+      "horizon": 7,
+      "point": 27.4,
+      "lo": 22.009999999999994,
+      "hi": 31.799999999999997
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-07",
+      "horizon": 1,
+      "point": 25.7,
+      "lo": 22.3,
+      "hi": 28.520000000000003
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-08",
+      "horizon": 2,
+      "point": 25.7,
+      "lo": 21.6,
+      "hi": 28.7
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-09",
+      "horizon": 3,
+      "point": 25.7,
+      "lo": 21.7,
+      "hi": 29.110000000000003
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-10",
+      "horizon": 4,
+      "point": 25.7,
+      "lo": 20.990000000000002,
+      "hi": 29.61
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-11",
+      "horizon": 5,
+      "point": 25.7,
+      "lo": 20.700000000000003,
+      "hi": 29.409999999999997
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-12",
+      "horizon": 6,
+      "point": 25.7,
+      "lo": 20.6,
+      "hi": 29.399999999999995
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-13",
+      "horizon": 7,
+      "point": 25.7,
+      "lo": 20.299999999999997,
+      "hi": 29.499999999999996
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-07",
+      "horizon": 1,
+      "point": 26.554973448252618,
+      "lo": 24.26906999672429,
+      "hi": 30.030180690054266
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-08",
+      "horizon": 2,
+      "point": 26.0873164046667,
+      "lo": 23.542036702232757,
+      "hi": 29.455916100941963
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-09",
+      "horizon": 3,
+      "point": 25.78573035170057,
+      "lo": 22.402325260957156,
+      "hi": 29.386578141890993
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-10",
+      "horizon": 4,
+      "point": 25.725891411455578,
+      "lo": 22.4842901923182,
+      "hi": 29.610405017784192
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-11",
+      "horizon": 5,
+      "point": 26.189522244160372,
+      "lo": 22.313156956365724,
+      "hi": 29.8805321517813
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-12",
+      "horizon": 6,
+      "point": 26.5745931173988,
+      "lo": 23.26901676766587,
+      "hi": 30.562087073861314
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-13",
+      "horizon": 7,
+      "point": 26.353425666353797,
+      "lo": 23.126463026015383,
+      "hi": 30.415642449676252
+    }
+  ]
+}
