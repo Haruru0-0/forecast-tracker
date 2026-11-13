@@ -1,20 +1,20 @@
 {
-  "last_run": "2026-11-12T11:13:54.611185+00:00",
+  "last_run": "2026-11-13T11:08:55.425248+00:00",
   "series": {
     "weather_tmax": {
-      "last_issue": "2026-11-12",
+      "last_issue": "2026-11-13",
       "error": null
     },
     "air_quality_aqi": {
-      "last_issue": "2026-11-12",
+      "last_issue": "2026-11-13",
       "error": null
     },
     "electricity_peak_mw": {
-      "last_issue": "2026-11-12",
+      "last_issue": "2026-11-13",
       "error": null
     },
     "river_discharge_cfs": {
-      "last_issue": "2026-11-12",
+      "last_issue": "2026-11-13",
       "error": null
     }
   }
