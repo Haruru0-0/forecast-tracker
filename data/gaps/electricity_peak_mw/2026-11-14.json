@@ -1,0 +1,4 @@
+{
+  "issue_date": "2026-11-14",
+  "reason": "source error: GET <url> failed after 3 attempts: HTTPSConnectionPool(host='api.eia.gov', port=443): Read timed out. (read timeout=30)"
+}
