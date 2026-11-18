@@ -1,0 +1,4 @@
+{
+  "issue_date": "2026-11-18",
+  "reason": "source error: GET <url> failed after 3 attempts: ('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer'))"
+}
