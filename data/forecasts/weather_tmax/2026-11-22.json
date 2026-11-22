@@ -1,0 +1,178 @@
+{
+  "issue_date": "2026-11-22",
+  "meta": {
+    "run_id": "45051609197",
+    "issued_at": "2026-11-22T17:50:06.474203+00:00",
+    "last_observed": "2026-11-21"
+  },
+  "rows": [
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-23",
+      "horizon": 1,
+      "point": 17.7,
+      "lo": 12.509999999999998,
+      "hi": 20.930000000000003
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-24",
+      "horizon": 2,
+      "point": 19.6,
+      "lo": 14.41,
+      "hi": 22.830000000000005
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-25",
+      "horizon": 3,
+      "point": 22.0,
+      "lo": 16.81,
+      "hi": 25.230000000000004
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-26",
+      "horizon": 4,
+      "point": 23.0,
+      "lo": 17.81,
+      "hi": 26.230000000000004
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-27",
+      "horizon": 5,
+      "point": 23.1,
+      "lo": 17.91,
+      "hi": 26.330000000000005
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-28",
+      "horizon": 6,
+      "point": 23.3,
+      "lo": 18.11,
+      "hi": 26.530000000000005
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-29",
+      "horizon": 7,
+      "point": 16.2,
+      "lo": 9.67,
+      "hi": 20.240000000000002
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-23",
+      "horizon": 1,
+      "point": 23.3,
+      "lo": 19.89,
+      "hi": 26.420000000000005
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-24",
+      "horizon": 2,
+      "point": 23.3,
+      "lo": 18.78,
+      "hi": 26.3
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-25",
+      "horizon": 3,
+      "point": 23.3,
+      "lo": 18.589999999999996,
+      "hi": 27.01
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-26",
+      "horizon": 4,
+      "point": 23.3,
+      "lo": 18.089999999999996,
+      "hi": 27.310000000000002
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-27",
+      "horizon": 5,
+      "point": 23.3,
+      "lo": 18.29,
+      "hi": 26.82
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-28",
+      "horizon": 6,
+      "point": 23.3,
+      "lo": 18.11,
+      "hi": 26.530000000000005
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-29",
+      "horizon": 7,
+      "point": 23.3,
+      "lo": 17.770000000000003,
+      "hi": 26.61
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-23",
+      "horizon": 1,
+      "point": 25.610161931985505,
+      "lo": 23.27453126116523,
+      "hi": 29.297837880139078
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-24",
+      "horizon": 2,
+      "point": 25.497275194484025,
+      "lo": 22.56087523076122,
+      "hi": 28.903349616178417
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-25",
+      "horizon": 3,
+      "point": 25.983342929497297,
+      "lo": 21.95400804512404,
+      "hi": 29.89766373336636
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-26",
+      "horizon": 4,
+      "point": 23.285098358864467,
+      "lo": 19.985029993750143,
+      "hi": 27.211037709214036
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-27",
+      "horizon": 5,
+      "point": 22.626469122913278,
+      "lo": 18.77708738827143,
+      "hi": 26.41718013215523
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-28",
+      "horizon": 6,
+      "point": 22.349481641560182,
+      "lo": 18.41528741182385,
+      "hi": 26.4956835463394
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-29",
+      "horizon": 7,
+      "point": 19.915261431923774,
+      "lo": 15.639655843730868,
+      "hi": 23.645648856340166
+    }
+  ]
+}
