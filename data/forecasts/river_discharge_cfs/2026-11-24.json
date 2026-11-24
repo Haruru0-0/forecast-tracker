@@ -1,0 +1,178 @@
+{
+  "issue_date": "2026-11-24",
+  "meta": {
+    "run_id": "45483030538",
+    "issued_at": "2026-11-24T20:39:36.843855+00:00",
+    "last_observed": "2026-11-23"
+  },
+  "rows": [
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-25",
+      "horizon": 1,
+      "point": 455.5625,
+      "lo": 0.0,
+      "hi": 893.5854166666666
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-26",
+      "horizon": 2,
+      "point": 327.53125,
+      "lo": 0.0,
+      "hi": 765.5541666666666
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-27",
+      "horizon": 3,
+      "point": 256.3854166666667,
+      "lo": 0.0,
+      "hi": 694.4083333333333
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-28",
+      "horizon": 4,
+      "point": 227.11458333333334,
+      "lo": 0.0,
+      "hi": 665.1374999999999
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-29",
+      "horizon": 5,
+      "point": 190.77083333333334,
+      "lo": 0.0,
+      "hi": 628.7937499999999
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-30",
+      "horizon": 6,
+      "point": 161.47916666666666,
+      "lo": 0.0,
+      "hi": 599.5020833333333
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-12-01",
+      "horizon": 7,
+      "point": 695.7916666666666,
+      "lo": 0.0,
+      "hi": 1158.8257395833334
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-25",
+      "horizon": 1,
+      "point": 161.47916666666666,
+      "lo": 0.0,
+      "hi": 331.9086458333335
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-26",
+      "horizon": 2,
+      "point": 161.47916666666666,
+      "lo": 0.0,
+      "hi": 359.5292708333334
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-27",
+      "horizon": 3,
+      "point": 161.47916666666666,
+      "lo": 0.0,
+      "hi": 408.65114583333343
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-28",
+      "horizon": 4,
+      "point": 161.47916666666666,
+      "lo": 0.0,
+      "hi": 470.9281250000007
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-29",
+      "horizon": 5,
+      "point": 161.47916666666666,
+      "lo": 0.0,
+      "hi": 469.62281250000115
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-30",
+      "horizon": 6,
+      "point": 161.47916666666666,
+      "lo": 0.0,
+      "hi": 599.5020833333333
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-12-01",
+      "horizon": 7,
+      "point": 161.47916666666666,
+      "lo": 0.0,
+      "hi": 536.4362500000002
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-25",
+      "horizon": 1,
+      "point": 137.38606207352208,
+      "lo": 0.0,
+      "hi": 344.58285398471867
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-26",
+      "horizon": 2,
+      "point": 182.30387584096587,
+      "lo": 0.0,
+      "hi": 590.3850803040323
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-27",
+      "horizon": 3,
+      "point": 173.43623939349862,
+      "lo": 0.0,
+      "hi": 581.1636418082016
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-28",
+      "horizon": 4,
+      "point": 212.94923329750367,
+      "lo": 0.0,
+      "hi": 619.0266796018193
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-29",
+      "horizon": 5,
+      "point": 191.37963141932468,
+      "lo": 0.0,
+      "hi": 551.5144109467092
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-30",
+      "horizon": 6,
+      "point": 217.53019162809898,
+      "lo": 0.0,
+      "hi": 477.95809152767066
+    },
+    {
+      "method": "model",
+      "target_date": "2026-12-01",
+      "horizon": 7,
+      "point": 219.74777196344976,
+      "lo": 0.0,
+      "hi": 549.2275761261592
+    }
+  ]
+}
