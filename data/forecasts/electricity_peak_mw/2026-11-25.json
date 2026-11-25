@@ -1,0 +1,178 @@
+{
+  "issue_date": "2026-11-25",
+  "meta": {
+    "run_id": "45690070786",
+    "issued_at": "2026-11-25T19:56:54.244609+00:00",
+    "last_observed": "2026-11-24"
+  },
+  "rows": [
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-26",
+      "horizon": 1,
+      "point": 53827.0,
+      "lo": 42184.6,
+      "hi": 59617.7
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-27",
+      "horizon": 2,
+      "point": 54333.0,
+      "lo": 42690.6,
+      "hi": 60123.7
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-28",
+      "horizon": 3,
+      "point": 53360.0,
+      "lo": 41717.6,
+      "hi": 59150.7
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-29",
+      "horizon": 4,
+      "point": 54110.0,
+      "lo": 42467.6,
+      "hi": 59900.7
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-30",
+      "horizon": 5,
+      "point": 54634.0,
+      "lo": 42991.6,
+      "hi": 60424.7
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-12-01",
+      "horizon": 6,
+      "point": 58778.0,
+      "lo": 47135.6,
+      "hi": 64568.7
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-12-02",
+      "horizon": 7,
+      "point": 53400.0,
+      "lo": 40536.4,
+      "hi": 58344.8
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-26",
+      "horizon": 1,
+      "point": 58778.0,
+      "lo": 53317.3,
+      "hi": 62810.700000000004
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-27",
+      "horizon": 2,
+      "point": 58778.0,
+      "lo": 53568.3,
+      "hi": 63807.9
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-28",
+      "horizon": 3,
+      "point": 58778.0,
+      "lo": 51963.8,
+      "hi": 63314.2
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-29",
+      "horizon": 4,
+      "point": 58778.0,
+      "lo": 51283.2,
+      "hi": 63745.200000000004
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-30",
+      "horizon": 5,
+      "point": 58778.0,
+      "lo": 49203.3,
+      "hi": 63600.5
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-12-01",
+      "horizon": 6,
+      "point": 58778.0,
+      "lo": 47135.6,
+      "hi": 64568.7
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-12-02",
+      "horizon": 7,
+      "point": 58778.0,
+      "lo": 47087.6,
+      "hi": 63549.0
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-26",
+      "horizon": 1,
+      "point": 57887.51562508071,
+      "lo": 52036.29254915691,
+      "hi": 61864.44175005253
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-27",
+      "horizon": 2,
+      "point": 56119.72724626296,
+      "lo": 50747.94973894091,
+      "hi": 60433.62051120311
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-28",
+      "horizon": 3,
+      "point": 54362.70230165009,
+      "lo": 49764.8672957809,
+      "hi": 61924.461560053736
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-29",
+      "horizon": 4,
+      "point": 53811.43768363625,
+      "lo": 47537.81997903859,
+      "hi": 62600.57410106858
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-30",
+      "horizon": 5,
+      "point": 56972.49172487504,
+      "lo": 51381.9780174748,
+      "hi": 63635.5284984954
+    },
+    {
+      "method": "model",
+      "target_date": "2026-12-01",
+      "horizon": 6,
+      "point": 57992.64770523753,
+      "lo": 50428.31420291226,
+      "hi": 62594.002329364135
+    },
+    {
+      "method": "model",
+      "target_date": "2026-12-02",
+      "horizon": 7,
+      "point": 57479.260699034305,
+      "lo": 48668.865632522895,
+      "hi": 62395.69885091045
+    }
+  ]
+}
