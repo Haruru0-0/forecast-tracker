@@ -1,0 +1,178 @@
+{
+  "issue_date": "2026-11-27",
+  "meta": {
+    "run_id": "46056877042",
+    "issued_at": "2026-11-27T19:28:32.615270+00:00",
+    "last_observed": "2026-11-26"
+  },
+  "rows": [
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-28",
+      "horizon": 1,
+      "point": 24.8,
+      "lo": 18.459999999999997,
+      "hi": 28.32
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-29",
+      "horizon": 2,
+      "point": 26.3,
+      "lo": 19.959999999999997,
+      "hi": 29.82
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-11-30",
+      "horizon": 3,
+      "point": 16.9,
+      "lo": 10.559999999999995,
+      "hi": 20.42
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-12-01",
+      "horizon": 4,
+      "point": 14.6,
+      "lo": 8.259999999999994,
+      "hi": 18.12
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-12-02",
+      "horizon": 5,
+      "point": 14.0,
+      "lo": 7.659999999999996,
+      "hi": 17.520000000000003
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-12-03",
+      "horizon": 6,
+      "point": 13.0,
+      "lo": 6.659999999999996,
+      "hi": 16.520000000000003
+    },
+    {
+      "method": "seasonal_naive",
+      "target_date": "2026-12-04",
+      "horizon": 7,
+      "point": 23.1,
+      "lo": 15.86,
+      "hi": 27.01
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-28",
+      "horizon": 1,
+      "point": 13.0,
+      "lo": 9.45,
+      "hi": 16.21
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-29",
+      "horizon": 2,
+      "point": 13.0,
+      "lo": 8.289999999999997,
+      "hi": 16.020000000000003
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-11-30",
+      "horizon": 3,
+      "point": 13.0,
+      "lo": 7.350000000000002,
+      "hi": 16.91
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-12-01",
+      "horizon": 4,
+      "point": 13.0,
+      "lo": 7.590000000000001,
+      "hi": 17.110000000000003
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-12-02",
+      "horizon": 5,
+      "point": 13.0,
+      "lo": 7.690000000000002,
+      "hi": 16.709999999999997
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-12-03",
+      "horizon": 6,
+      "point": 13.0,
+      "lo": 6.659999999999996,
+      "hi": 16.520000000000003
+    },
+    {
+      "method": "persistence",
+      "target_date": "2026-12-04",
+      "horizon": 7,
+      "point": 13.0,
+      "lo": 7.120000000000003,
+      "hi": 16.4
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-28",
+      "horizon": 1,
+      "point": 18.97060790101696,
+      "lo": 15.696930292843504,
+      "hi": 22.25969147038306
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-29",
+      "horizon": 2,
+      "point": 20.097720968632412,
+      "lo": 15.826874221088175,
+      "hi": 24.32831507290875
+    },
+    {
+      "method": "model",
+      "target_date": "2026-11-30",
+      "horizon": 3,
+      "point": 19.29100072608478,
+      "lo": 13.695738832463588,
+      "hi": 23.55786277857613
+    },
+    {
+      "method": "model",
+      "target_date": "2026-12-01",
+      "horizon": 4,
+      "point": 20.773861617838545,
+      "lo": 15.763768653177998,
+      "hi": 25.08390181300149
+    },
+    {
+      "method": "model",
+      "target_date": "2026-12-02",
+      "horizon": 5,
+      "point": 20.81856130965042,
+      "lo": 16.52423671748973,
+      "hi": 24.771251390436724
+    },
+    {
+      "method": "model",
+      "target_date": "2026-12-03",
+      "horizon": 6,
+      "point": 19.12556285484793,
+      "lo": 14.323842608008121,
+      "hi": 23.107954530073812
+    },
+    {
+      "method": "model",
+      "target_date": "2026-12-04",
+      "horizon": 7,
+      "point": 22.742996332941914,
+      "lo": 18.00807125917158,
+      "hi": 26.932607806361013
+    }
+  ]
+}
